@@ -43,7 +43,7 @@ void
 commit_odp_set_nw_actions(const struct flow *flow, struct flow *base,
                    struct ofpbuf *odp_actions, struct flow_wildcards *wc);
 void
-set_ipv6_segment(const struct flow *flow);
+set_ipv6_segment(const struct flow *flow, const struct in6_addr *last_dst_ipv6);
 
 static void
 commit_set_ipv6_segments_action(const struct flow *flow, struct flow *base,

@@ -2180,6 +2180,8 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
     struct flow_wildcards *wc = &ctx->xout->wc;
     struct flow *flow = &ctx->xin->flow;
     const struct ofpact *a;
+    //BN
+    struct in6_addr last_ipv6;
 
     //BN
     VLOG_WARN("do_xlate_actions: ofpacts_len = %d\n", ofpacts_len);
@@ -2310,7 +2312,9 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
             nxm_execute_reg_load(ofpact_get_REG_LOAD(a), flow);
 	    //BN
 	    VLOG_WARN("RED_LOAD\n");
-	    set_ipv6_segment(flow);	
+	    set_ipv6_segment(flow, &last_ipv6);	
+	    //BN: because the ovs-ofctl add-flow somehow parses the RED_LOAD to become multiple duplicate REG_LOAD, so need to filter out duplicated segments.
+	    memcpy(&last_ipv6, &flow->ipv6_dst, sizeof(struct in6_addr));
 	    //commit_odp_set_nw_actions(flow, &ctx->base_flow,
             //               &ctx->xout->odp_actions, &ctx->xout->wc);
             break;

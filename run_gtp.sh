@@ -30,5 +30,5 @@ ovs-vsctl add-port br0 srv62 -- set interface srv62 type=srv6 options:remote_ip=
 ovs-vsctl add-port br0 srv63 -- set interface srv63 type=srv6 options:remote_ip=flow options:local_ip=flow options:in_key=flow options:out_key=flow options:dst_port=2154
 
 
-#./utilities/ovs-vsctl set-controller br0 tcp:127.0.0.1
+./utilities/ovs-vsctl set-controller br0 tcp:127.0.0.1
 ovs-vsctl show

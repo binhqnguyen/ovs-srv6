@@ -27,7 +27,7 @@ $OVS_OFCTL del-flows br0 in_port=$ENCAP
 #$OVS_OFCTL add-flow br0 in_port=$ENCAP,priority=2,eth_type=$IP_TYPE,actions=output:$NETB
 
 #$OVS_OFCTL add-flow br0 in_port=$NETA,priority=2,eth_type=$IPV6_TYPE,actions="set_field:fe80::3efd:feff:fe04:7dc0->ipv6_dst","set_field:fe80::3efd:feff:fe04:7dc1->ipv6_dst","set_field:fe80::3efd:feff:fe04:7dc2->ipv6_dst",output:$ENCAP
-$OVS_OFCTL add-flow br0 in_port=$NETA,priority=2,eth_type=$IPV6_TYPE,ipv6_dst="2001::211:43ff:fee4:9720",actions="set_field:2001::204:23ff:feb7:17be->ipv6_dst",output:$ENCAP
+$OVS_OFCTL add-flow br0 in_port=$NETA,priority=2,eth_type=$IPV6_TYPE,ipv6_dst="2001::211:43ff:fee4:9720",actions="set_field:2001::204:23ff:feb7:17be->ipv6_dst","set_field:fe80::3efd:feff:fe04:7dc6->ipv6_dst","set_field:fe80::3efd:feff:fe04:7dc7->ipv6_dst",output:$ENCAP
 #$OVS_OFCTL add-flow br0 in_port=$NETA,priority=2,eth_type=$IPV6_TYPE,ipv6_dst="2001::211:43ff:fee4:9716",actions="set_field:fe80::3efd:feff:fe04:7dc5->ipv6_dst","set_field:fe80::3efd:feff:fe04:7dc6->ipv6_dst","set_field:fe80::3efd:feff:fe04:7dc7->ipv6_dst",output:$ENCAP
 #$OVS_OFCTL add-flow br0 in_port=$NETA,priority=2,eth_type=$IPV6_TYPE,actions="set_field:fe80::3efd:feff:fe04:7dc0->ipv6_dst","set_field:fe80::3efd:feff:fe04:7dc1->ipv6_dst",output:$ENCAP
 #$OVS_OFCTL -v add-flow br0 in_port=$ENCAP,priority=2,actions=output:$NETB

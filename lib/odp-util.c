@@ -3572,17 +3572,33 @@ commit_odp_set_nw_actions(const struct flow *flow, struct flow *base,
 }
 
 void
-set_ipv6_segment(struct flow *flow)
+set_ipv6_segment(struct flow *flow, struct in6_addr *last_dst_ipv6)
 {
-	if (flow->current_segment/2 < MAX_IPV6_SEGMENTS){
-		if  (flow->current_segment % 2 == 1){ //because every 2 set_field is an ipv6
-			VLOG_INFO("set_ipv6_segment: set ipv6 in flow, index = %d\n", flow->current_segment/2);
-			flow->ipv6_segments[flow->current_segment/2] = flow->ipv6_dst;
+	unsigned char empty[16];
+	int i = 0;
+	for (i = 0; i < 16; i++){
+		empty[i] = 0;
+	}
+	if (flow->current_segment < MAX_IPV6_SEGMENTS){
+		VLOG_WARN("flow->current_segment = %d\n", flow->current_segment);
+		for (i = 0; i < 4; i++){
+			VLOG_WARN("flow->ipv6_dst = %02X\n", flow->ipv6_dst.s6_addr32[i]);
+		}
+		if (last_dst_ipv6)
+			for (i = 0; i < 4; i++){
+				VLOG_WARN("last_ipv6_dst = %02X\n", last_dst_ipv6->s6_addr32[i]);
+			}
+
+		if (last_dst_ipv6 && memcmp(last_dst_ipv6, &flow->ipv6_dst, sizeof(struct in6_addr)) == 0) {
+			VLOG_WARN("Already encounter this set ipv6_dst\n");
+			return;
+		} else {
+			VLOG_INFO("set_ipv6_segment: set ipv6 in flow, index = %d\n", flow->current_segment);
+			flow->ipv6_segments[flow->current_segment++] = flow->ipv6_dst;
 		}
 	} else {
 		VLOG_ERR("More segments received than the maximum allowed IPv6 segments %d\n", MAX_IPV6_SEGMENTS);
 	}
-	flow->current_segment++;
 }
 
 static void
@@ -3629,7 +3645,7 @@ commit_set_ipv6_segments_action(const struct flow *flow, struct flow *base,
     }
 
     if (base->dl_type == htons(ETH_TYPE_IPV6)) {
-	for (i = 0 ; i < flow->current_segment/2; i++){ 
+	for (i = 0 ; i < flow->current_segment; i++){ 
         	commit_set_ipv6_segment(flow, base, odp_actions, i, wc);
 	}
     } else {
