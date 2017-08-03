@@ -1,0 +1,1 @@
+cmd_/users/binh/openvswitch/datapath/linux/openvswitch.ko := ld -r -m elf_x86_64 -T /usr/src/linux-headers-3.2.0-56-generic/scripts/module-common.lds --build-id  -o /users/binh/openvswitch/datapath/linux/openvswitch.ko /users/binh/openvswitch/datapath/linux/openvswitch.o /users/binh/openvswitch/datapath/linux/openvswitch.mod.o

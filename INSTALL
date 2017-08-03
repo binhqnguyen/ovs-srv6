@@ -1,0 +1,5 @@
+Compile and install for the 1st time:
+sudo ./install.sh
+
+Recompile:
+sudo ./re_compile.sh

@@ -1,0 +1,8 @@
+lib/dummy.o: lib/dummy.c config.h lib/dummy.h \
+ /usr/lib/gcc/x86_64-linux-gnu/4.6/include/stdbool.h
+
+config.h:
+
+lib/dummy.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/4.6/include/stdbool.h:

@@ -1,0 +1,760 @@
+AT_BANNER([bfd])
+
+m4_define([BFD_CHECK], [
+AT_CHECK([ovs-appctl bfd/show $1 | sed -e '/Time:/d' | sed -e '/Discriminator/d' | sed -e '/Interval:/d'],[0],
+[dnl
+	Forwarding: $2
+	Detect Multiplier: 3
+	Concatenated Path Down: $3
+
+	Local Flags: $4
+	Local Session State: $5
+	Local Diagnostic: $6
+
+	Remote Flags: $7
+	Remote Session State: $8
+	Remote Diagnostic: $9
+])
+])
+
+m4_define([BFD_CHECK_TX], [
+AT_CHECK([ovs-appctl bfd/show $1 | sed -n '/TX Interval/p'],[0],
+[dnl
+	TX Interval: Approx $2
+	Local Minimum TX Interval: $3
+	Remote Minimum TX Interval: $4
+])
+])
+
+m4_define([BFD_CHECK_RX], [
+AT_CHECK([ovs-appctl bfd/show $1 | sed -n '/RX Interval/p'],[0],
+[dnl
+	RX Interval: Approx $2
+	Local Minimum RX Interval: $3
+	Remote Minimum RX Interval: $4
+])
+])
+AT_SETUP([bfd - basic config on different bridges])
+#Create 2 bridges connected by patch ports and enable BFD
+OVS_VSWITCHD_START(
+   [add-br br1 -- \
+       set bridge br1 datapath-type=dummy \
+       other-config:hwaddr=aa:55:aa:56:00:00 -- \
+    add-port br1 p1 -- set Interface p1 type=patch \
+       options:peer=p0 -- \
+    add-port br0 p0 -- set Interface p0 type=patch \
+       options:peer=p1 -- \
+    set Interface p0 bfd:enable=true -- \
+    set Interface p1 bfd:enable=true ])
+ovs-appctl time/stop
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+
+#Verify that BFD has been enabled on both interfaces.
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+
+AT_CHECK([ ovs-vsctl set interface p0 bfd:enable=false])
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+BFD_CHECK([p1], [false], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+
+AT_CHECK([ ovs-vsctl set interface p0 bfd:enable=true])
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+BFD_CHECK([p1], [true], [false], [none], [up], [Control Detection Time Expired], [none], [up], [No Diagnostic])
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [Control Detection Time Expired])
+
+ovs-vsctl del-br br0
+AT_CHECK([ovs-appctl bfd/show p0], [2],[ignore], [no such bfd object
+ovs-appctl: ovs-vswitchd: server returned an error
+])
+ovs-vsctl del-br br1
+#Check that the entries are gone.
+AT_CHECK([ovs-appctl bfd/show p1], [2],[ignore], [no such bfd object
+ovs-appctl: ovs-vswitchd: server returned an error
+])
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+
+AT_SETUP([bfd - Verify tunnel down detection])
+#Create 3 bridges - br-bfd0, br-bfd1 and br-sw which is midway between the two. br2 is
+#connected to br-bfd0 and br-bfd1 through patch ports p0-2 and p1-2. Enable BFD on
+#interfaces in br-bfd0 and br-bfd1. When br-sw is dropping all packets, BFD should detect
+# that the tunnel is down, and come back up when br-sw is working fine.
+
+OVS_VSWITCHD_START(
+   [add-br br-bfd0 -- \
+       set bridge br-bfd0 datapath-type=dummy \
+       other-config:hwaddr=aa:55:aa:56:00:00 -- \
+    add-br br-bfd1 -- \
+       set bridge br-bfd1 datapath-type=dummy \
+       other-config:hwaddr=aa:55:aa:57:00:00 -- \
+    add-br br-sw -- \
+       set bridge br-sw datapath-type=dummy \
+       other-config:hwaddr=aa:55:aa:58:00:00 -- \
+    add-port br-sw p1-sw -- set Interface p1-sw type=patch \
+       options:peer=p1 -- \
+    add-port br-sw p0-sw -- set Interface p0-sw type=patch \
+       options:peer=p0 -- \
+    add-port br-bfd1 p1 -- set Interface p1 type=patch \
+       options:peer=p1-sw bfd:enable=true -- \
+    add-port br-bfd0 p0 -- set Interface p0 type=patch \
+       options:peer=p0-sw bfd:enable=true --])
+
+ovs-appctl time/stop
+
+#Create 2 bridges connected by patch ports and enable BFD
+
+AT_CHECK([ovs-ofctl add-flow br-sw 'priority=0,actions=NORMAL'])
+#Verify that BFD is enabled.
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+
+#Drop all packets in the br-sw bridge so that the tunnel is down.
+AT_CHECK([ ovs-ofctl add-flow br-sw 'priority=5,actions=drop' ])
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+BFD_CHECK([p1], [false], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+BFD_CHECK([p0], [false], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+
+#Delete the added flow
+AT_CHECK([ovs-ofctl del-flows br-sw], [0])
+AT_CHECK([ovs-ofctl add-flow br-sw 'priority=0,actions=NORMAL'])
+#Verify that BFD is back up again.
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+
+BFD_CHECK([p1], [true], [false], [none], [up], [Control Detection Time Expired], [none], [up], [Control Detection Time Expired])
+BFD_CHECK([p0], [true], [false], [none], [up], [Control Detection Time Expired], [none], [up], [Control Detection Time Expired])
+
+#Now, Verify one-side tunnel down detection
+#When br-sw is dropping packets from one end, BFD should detect
+# that the tunnel is down, and come back up when br-sw is working fine.
+
+#Bring down the br-bfd1 - br-sw link. So BFD packets will be sent from p0,
+# but not received by p1. p0 will receive all BFD packets from p1.
+
+AT_CHECK([ ovs-ofctl add-flow br-sw 'in_port=1,priority=5,actions=drop'])
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+# Make sure p1 BFD state is down since it received no BFD packets.
+BFD_CHECK([p1], [false], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+# p0 will be in init state once it receives "down" BFD message from p1.
+BFD_CHECK([p0], [false], [false], [none], [init], [Neighbor Signaled Session Down], [none], [down], [Control Detection Time Expired])
+
+AT_CHECK([ovs-ofctl del-flows br-sw])
+AT_CHECK([ovs-ofctl add-flow br-sw 'priority=0,actions=NORMAL'])
+#Ensure that BFD is back up again.
+
+for i in `seq 0 10`; do ovs-appctl time/warp 100; done
+#Bring down the br-bfd0 - br-sw link
+AT_CHECK([ ovs-ofctl add-flow br-sw 'in_port=2,priority=5,actions=drop'])
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+BFD_CHECK([p0], [false], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+BFD_CHECK([p1], [false], [false], [none], [init], [Neighbor Signaled Session Down], [none], [down], [Control Detection Time Expired])
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+
+AT_SETUP([bfd - concatenated path down])
+#Create 2 bridges connected by patch ports and enable BFD
+OVS_VSWITCHD_START()
+ovs-appctl time/stop
+AT_CHECK([ ovs-vsctl -- add-br br1 -- \
+           set bridge br1 datapath-type=dummy \
+           other-config:hwaddr=aa:55:aa:56:00:00 ])
+AT_CHECK([ ovs-vsctl -- add-port br1 p1 -- set Interface p1 type=patch \
+           options:peer=p0 ])
+AT_CHECK([ ovs-vsctl -- add-port br0 p0 -- set Interface p0 type=patch \
+           options:peer=p1 ])
+AT_CHECK([ ovs-vsctl -- set interface p0 bfd:enable=true ])
+AT_CHECK([ ovs-vsctl -- set interface p1 bfd:enable=true ])
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+
+#Verify that BFD has been enabled on both interfaces.
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+
+#Set cpath_down to true on one interface, make sure the remote interface updates its values.
+AT_CHECK([ovs-vsctl set interface p0 bfd:cpath_down=true])
+for i in `seq 0 40`; do ovs-appctl time/warp 100; done
+BFD_CHECK([p1], [false], [false], [none], [up], [No Diagnostic], [none], [up], [Concatenated Path Down])
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+
+AT_SETUP([bfd - Edit the Min Tx/Rx values])
+#Create 2 bridges connected by patch ports and enable BFD
+OVS_VSWITCHD_START()
+ovs-appctl time/stop
+AT_CHECK([ ovs-vsctl -- add-br br1 -- \
+           set bridge br1 datapath-type=dummy ])
+AT_CHECK([ ovs-vsctl -- add-port br1 p1 -- set Interface p1 type=patch \
+           options:peer=p0 ])
+AT_CHECK([ ovs-vsctl -- add-port br0 p0 -- set Interface p0 type=patch \
+           options:peer=p1 ])
+AT_CHECK([ ovs-vsctl -- set interface p0 bfd:enable=true ])
+AT_CHECK([ ovs-vsctl -- set interface p1 bfd:enable=true ])
+for i in `seq 0 30`; do ovs-appctl time/warp 100; done
+#Verify that BFD has been enabled on both interfaces.
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+#Edit the min Tx value.
+AT_CHECK([ovs-vsctl set interface p0 bfd:min_tx=200])
+for i in `seq 0 20`; do ovs-appctl time/warp 100; done
+BFD_CHECK_TX([p0], [1000ms], [200ms], [100ms])
+BFD_CHECK_TX([p1], [1000ms], [100ms], [200ms])
+
+#Edit the min Rx value.
+AT_CHECK([ovs-vsctl set interface p1 bfd:min_rx=300])
+for i in `seq 0 20`; do ovs-appctl time/warp 100; done
+BFD_CHECK_RX([p1], [300ms], [300ms], [1000ms])
+BFD_CHECK_RX([p0], [1000ms], [1000ms], [300ms])
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([bfd - check_tnl_key])
+OVS_VSWITCHD_START([add-port br0 p1 -- set Interface p1 type=gre \
+                    options:remote_ip=2.2.2.2 options:key=1 ofport_request=1 -- \
+                    set interface p1 bfd:enable=true -- \
+                    set bridge br0 fail-mode=standalone])
+
+# by default check_tnl_key is false. so we should process a bfd packet with tun_id=1.
+AT_CHECK([ovs-appctl ofproto/trace ovs-dummy 'tunnel(tun_id=0x1,src=2.2.2.2,dst=2.2.2.1,tos=0x0,ttl=64,flags(key)),in_port(1),skb_mark(0/0),eth(src=00:11:22:33:44:55,dst=00:23:20:00:00:01),eth_type(0x0800),ipv4(src=169.254.1.0/0.0.0.0,dst=169.254.1.1/0.0.0.0,proto=17/0xff,tos=0/0,ttl=255/0,frag=no/0xff),udp(src=49152/0,dst=3784/0xffff)' -generate], [0], [stdout])
+# check that the packet should be handled as BFD packet.
+AT_CHECK([tail -2 stdout], [0], [dnl
+This flow is handled by the userspace slow path because it:
+	- Consists of BFD packets.
+], [])
+
+# turn on the check_tnl_key.
+AT_CHECK([ovs-vsctl set interface p1 bfd:check_tnl_key=true])
+AT_CHECK([ovs-appctl ofproto/trace ovs-dummy 'tunnel(tun_id=0x1,src=2.2.2.2,dst=2.2.2.1,tos=0x0,ttl=64,flags(key)),in_port(1),skb_mark(0/0),eth(src=00:11:22:33:44:55,dst=00:23:20:00:00:01),eth_type(0x0800),ipv4(src=169.254.1.0/0.0.0.0,dst=169.254.1.1/0.0.0.0,proto=17/0xff,tos=0/0,ttl=255/0,frag=no/0xff),udp(src=49152/0,dst=3784/0xffff)' -generate], [0], [stdout])
+# check that the packet should be handled as normal packet.
+AT_CHECK([tail -1 stdout], [0],[dnl
+Datapath actions: 100
+], [])
+
+# set the tunnel key to 0.
+AT_CHECK([ovs-vsctl set interface p1 options:key=0])
+AT_CHECK([ovs-appctl ofproto/trace ovs-dummy 'tunnel(tun_id=0x0,src=2.2.2.2,dst=2.2.2.1,tos=0x0,ttl=64,flags(key)),in_port(1),skb_mark(0/0),eth(src=00:11:22:33:44:55,dst=00:23:20:00:00:01),eth_type(0x0800),ipv4(src=169.254.1.0/0.0.0.0,dst=169.254.1.1/0.0.0.0,proto=17/0xff,tos=0/0,ttl=255/0,frag=no/0xff),udp(src=49152/0,dst=3784/0xffff)' -generate], [0], [stdout])
+# check that the packet should be handled as BFD packet.
+AT_CHECK([tail -2 stdout], [0], [dnl
+This flow is handled by the userspace slow path because it:
+	- Consists of BFD packets.
+], [])
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+# Tests below are for bfd decay features.
+AT_SETUP([bfd - bfd decay])
+OVS_VSWITCHD_START([add-br br1 -- set bridge br1 datapath-type=dummy -- \
+                    add-port br1 p1 -- set Interface p1 type=patch \
+                    options:peer=p0 ofport_request=2 -- \
+                    add-port br0 p0 -- set Interface p0 type=patch \
+                    options:peer=p1 ofport_request=1 -- \
+                    set Interface p0 bfd:enable=true bfd:min_tx=300 bfd:min_rx=300 bfd:decay_min_rx=3000 -- \
+                    set Interface p1 bfd:enable=true bfd:min_tx=500 bfd:min_rx=500])
+
+ovs-appctl time/stop
+
+# wait for local session state to go from down to up.
+for i in `seq 0 1`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [init], [No Diagnostic])
+
+
+# Test-1 BFD decay: decay to decay_min_rx
+# bfd:decay_min_rx is set to 3000ms after the local state of p0 goes up,
+# so for the first 2500ms, there should be no change.
+for i in `seq 0 4`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [500ms], [300ms], [500ms])
+
+# advance the clock by 500ms.
+ovs-appctl time/warp 500
+# now at 3000ms, min_rx should decay to 3000ms and there should be
+# poll sequence flags.
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [3000ms], [3000ms], [500ms])
+
+# since the tx_min of p0 is still 500ms, after 500ms from decay,
+# the control message will be sent from p0 to p1, and p1 'flag'
+# will go back to none.
+ovs-appctl time/warp 500
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+
+# the rx_min of p0 is 3000ms now, and p1 will send next control message
+# 3000ms after decay. so, advance clock by 2500ms to make that happen.
+for i in `seq 0 4`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [3000ms], [3000ms], [500ms])
+# End of Test-1 ###############################################################
+
+
+# Test-2 BFD decay: go back to cfg_min_rx when there is traffic
+# receive packet at 1/100ms rate for 3000ms.
+for i in `seq 0 30`
+do
+    ovs-appctl time/warp 100
+    AT_CHECK([ovs-ofctl packet-out br1 3 2  "90e2ba01475000101856b2e80806000108000604000100101856b2e80202020300000000000002020202"],
+             [0], [stdout], [])
+done
+# after a decay interval (3000ms), the p0 min_rx will go back to
+# cfg_min_rx. there should be poll sequence flags.
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [500ms], [300ms], [500ms])
+
+# 500ms later, both direction will send control messages,
+# and their 'flag' will go back to none.
+ovs-appctl time/warp 500
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [500ms], [300ms], [500ms])
+# End of Test-2 ###############################################################
+
+
+# Test-3 BFD decay: go back to cfg_min_rx when decay_min_rx is changed
+# advance the clock by 2500ms to 3000m after restore of
+# min_rx. p0 is decayed, and there should be the poll sequence flags.
+for i in `seq 0 4`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [3000ms], [3000ms], [500ms])
+
+# advance the clock, to make 'flag' go back to none.
+for i in `seq 0 5`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+
+# change decay_min_rx to 1000ms.
+# for decay_min_rx < 2000ms, the decay detection time is set to 2000ms.
+# this should firstly reset the min_rx and start poll sequence.
+AT_CHECK([ovs-vsctl set Interface p0 bfd:decay_min_rx=1000])
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [500ms], [300ms], [500ms])
+
+# for the following 1500ms, there should be no decay,
+# since the decay_detect_time is set to 2000ms.
+for i in `seq 0 2`
+do
+    ovs-appctl time/warp 500
+    BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+    BFD_CHECK_RX([p0], [500ms], [300ms], [500ms])
+done
+
+ovs-appctl time/warp 500
+# at 2000ms, decay should happen and there should be the poll sequence flags.
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [1000ms], [1000ms], [500ms])
+# advance the clock, so 'flag' go back to none.
+for i in `seq 0 4`; do ovs-appctl time/warp 500; done
+# End of Test-3 ###############################################################
+
+
+# Test-4 BFD decay: set min_rx to 800ms.
+# this should firstly reset the min_rx and then re-decay to 1000ms.
+AT_CHECK([ovs-vsctl set Interface p0 bfd:min_rx=800])
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [800ms], [800ms], [500ms])
+
+# for the following 1600ms, there should be no decay,
+# since the decay detection time is set to 2000ms.
+for i in `seq 0 1`
+do
+    ovs-appctl time/warp 800
+    BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+    BFD_CHECK_RX([p0], [800ms], [800ms], [500ms])
+done
+
+ovs-appctl time/warp 400
+# at 2000ms, decay should happen and there should be the poll sequence flags.
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [1000ms], [1000ms], [500ms])
+# advance the clock, so 'flag' go back to none.
+for i in `seq 0 4`; do ovs-appctl time/warp 500; done
+# End of Test-4 ###############################################################
+
+
+# Test-5 BFD decay: set min_rx to 300ms and decay_min_rx to 5000ms together.
+AT_CHECK([ovs-vsctl set Interface p0 bfd:min_rx=300 bfd:decay_min_rx=5000])
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [500ms], [300ms], [500ms])
+
+# for decay_min_rx > 2000ms, the decay detection time is set to
+# decay_min_rx (5000ms).
+# for the following 4500ms, there should be no decay,
+# since the decay detection time is set to 5000ms.
+for i in `seq 0 8`
+do
+    ovs-appctl time/warp 500
+    BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+    BFD_CHECK_RX([p0], [500ms], [300ms], [500ms])
+done
+
+ovs-appctl time/warp 500
+# at 5000ms, decay should happen and there should be the poll sequence flags.
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [5000ms], [5000ms], [500ms])
+# advance the clock, to make 'flag' go back to none.
+for i in `seq 0 9`; do ovs-appctl time/warp 500; done
+# End of Test-5 ###############################################################
+
+
+# Test-6 BFD decay: set decay_min_rx to 0 to disable bfd decay.
+AT_CHECK([ovs-vsctl set Interface p0 bfd:decay_min_rx=0])
+# min_rx is reset, and there should be the poll sequence flags.
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [500ms], [300ms], [500ms])
+for i in `seq 0 20`
+do
+    ovs-appctl time/warp 500
+    BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+    BFD_CHECK_RX([p0], [500ms], [300ms], [500ms])
+done
+# End of Test-6 ################################################################
+
+
+# Test-7 BFD decay: rmt_min_tx is greater than decay_min_rx
+AT_CHECK([ovs-vsctl set Interface p0 bfd:decay_min_rx=3000 -- set interface p1 bfd:min_tx=5000])
+# there will be poll sequences from both sides. and it is hard to determine the
+# order. so just skip 10000ms and check the RX/TX. at that time, p0 should be in decay already.
+for i in `seq 0 19`; do echo $i; ovs-appctl bfd/show; ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [5000ms])
+BFD_CHECK_RX([p0], [5000ms], [3000ms], [500ms])
+# then, there should be no change of status,
+for i in `seq 0 9`
+do
+    ovs-appctl time/warp 500
+    BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    BFD_CHECK_TX([p0], [500ms], [300ms], [5000ms])
+    BFD_CHECK_RX([p0], [5000ms], [3000ms], [500ms])
+done
+# reset the p1's min_tx to 500ms.
+AT_CHECK([ovs-vsctl set Interface p1 bfd:min_tx=500])
+# check the poll sequence. since p0 has been in decay, now the RX will show 3000ms.
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [3000ms], [3000ms], [500ms])
+# advance the clock by 3000ms, at that time, p1 will send the control packets.
+# then there will be no poll flags.
+for i in `seq 0 5`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [3000ms], [3000ms], [500ms])
+# End of Test-7 ###############################################################
+
+
+# Test-8 BFD decay: state up->down->up.
+# turn bfd off on p1
+AT_CHECK([ovs-vsctl set Interface p1 bfd:enable=false])
+
+# check the state change of bfd on p0. After 9000 ms (3 min_rx intervals)
+for i in `seq 0 8`; do ovs-appctl time/warp 1000; done
+BFD_CHECK([p0], [false], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+BFD_CHECK_TX([p0], [1000ms], [1000ms], [0ms])
+BFD_CHECK_RX([p0], [300ms], [300ms], [1ms])
+
+# resume the bfd on p1. the bfd should not go to decay mode direclty.
+AT_CHECK([ovs-vsctl set Interface p1 bfd:enable=true])
+for i in `seq 0 1`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [Control Detection Time Expired], [none], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [500ms], [300ms], [500ms])
+
+# since the decay_min_rx is still 3000ms, so after 3000ms, there should be the decay and poll sequence.
+for i in `seq 0 5`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [Control Detection Time Expired], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [Control Detection Time Expired])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [3000ms], [3000ms], [500ms])
+# End of Test-8 ################################################################
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+# Tests below are for bfd forwarding_if_rx feature.
+# forwarding_if_rx Test1: bfd is enabled on one end of link.
+AT_SETUP([bfd - bfd forwarding_if_rx 1])
+OVS_VSWITCHD_START([add-br br1 -- set bridge br1 datapath-type=dummy -- \
+                    add-port br1 p1 -- set Interface p1 type=patch \
+                    options:peer=p0 ofport_request=2 -- \
+                    add-port br0 p0 -- set Interface p0 type=patch \
+                    options:peer=p1 ofport_request=1 -- \
+                    set Interface p0 bfd:enable=true bfd:min_tx=500 bfd:min_rx=500 -- \
+                    add-port br1 p2 -- set Interface p2 type=internal ofport_request=3])
+
+ovs-appctl time/stop
+# check the inital status.
+BFD_CHECK([p0], [false], [false], [none], [down], [No Diagnostic], [none], [down], [No Diagnostic])
+BFD_CHECK_TX([p0], [1000ms], [1000ms], [0ms])
+BFD_CHECK_RX([p0], [500ms], [500ms], [1ms])
+
+# enable forwarding_if_rx.
+AT_CHECK([ovs-vsctl set Interface p0 bfd:forwarding_if_rx=true], [0])
+
+# there should be no change of forwarding flag, since
+# there is no traffic.
+for i in `seq 0 3`
+do
+    ovs-appctl time/warp 500
+    BFD_CHECK([p0], [false], [false], [none], [down], [No Diagnostic], [none], [down], [No Diagnostic])
+done
+
+# receive one packet.
+AT_CHECK([ovs-ofctl packet-out br1 3 2  "90e2ba01475000101856b2e80806000108000604000100101856b2e80202020300000000000002020202"],
+             [0], [stdout], [])
+for i in `seq 0 14`
+do
+    ovs-appctl time/warp 100
+    # the forwarding flag should be true, since there is data received.
+    BFD_CHECK([p0], [true], [false], [none], [down], [No Diagnostic], [none], [down], [No Diagnostic])
+    BFD_CHECK_TX([p0], [1000ms], [1000ms], [0ms])
+    BFD_CHECK_RX([p0], [500ms], [500ms], [1ms])
+done
+
+# Stop sending packets for 1000ms.
+for i in `seq 0 9`; do ovs-appctl time/warp 100; done
+BFD_CHECK([p0], [false], [false], [none], [down], [No Diagnostic], [none], [down], [No Diagnostic])
+BFD_CHECK_TX([p0], [1000ms], [1000ms], [0ms])
+BFD_CHECK_RX([p0], [500ms], [500ms], [1ms])
+
+# receive packet at 1/100ms rate for 1000ms.
+for i in `seq 0 9`
+do
+    ovs-appctl time/warp 100
+    AT_CHECK([ovs-ofctl packet-out br1 3 2  "90e2ba01475000101856b2e80806000108000604000100101856b2e80202020300000000000002020202"],
+             [0], [stdout], [])
+done
+# the forwarding flag should be true, since there is data received.
+BFD_CHECK([p0], [true], [false], [none], [down], [No Diagnostic], [none], [down], [No Diagnostic])
+BFD_CHECK_TX([p0], [1000ms], [1000ms], [0ms])
+BFD_CHECK_RX([p0], [500ms], [500ms], [1ms])
+
+# reset bfd forwarding_if_rx.
+AT_CHECK([ovs-vsctl set Interface p0 bfd:forwarding_if_rx=false], [0])
+# forwarding flag should turn to false since the STATE is DOWN.
+BFD_CHECK([p0], [false], [false], [none], [down], [No Diagnostic], [none], [down], [No Diagnostic])
+BFD_CHECK_TX([p0], [1000ms], [1000ms], [0ms])
+BFD_CHECK_RX([p0], [500ms], [500ms], [1ms])
+
+AT_CHECK([ovs-vsctl del-br br1], [0], [ignore])
+AT_CLEANUP
+
+# forwarding_if_rx Test2: bfd is enabled on both ends of link.
+AT_SETUP([bfd - bfd forwarding_if_rx 2])
+OVS_VSWITCHD_START([add-br br1 -- set bridge br1 datapath-type=dummy -- \
+                    add-port br1 p1 -- set Interface p1 type=patch \
+                    options:peer=p0 ofport_request=2 -- \
+                    add-port br0 p0 -- set Interface p0 type=patch \
+                    options:peer=p1 ofport_request=1 -- \
+                    set Interface p0 bfd:enable=true bfd:min_tx=500 bfd:min_rx=500 -- \
+                    set Interface p1 bfd:enable=true bfd:min_tx=300 bfd:min_rx=300 -- \
+                    add-port br1 p2 -- set Interface p2 type=internal ofport_request=3])
+
+ovs-appctl time/stop
+# advance the clock, to stablize the states.
+for i in `seq 0 9`; do ovs-appctl time/warp 500; done
+
+# enable forwarding_if_rx.
+AT_CHECK([ovs-vsctl set Interface p0 bfd:forwarding_if_rx=true], [0])
+
+# there should be no change of the forwarding flag, since
+# the bfd on both ends is already up.
+for i in `seq 0 5`
+do
+    ovs-appctl time/warp 500
+    BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+done
+
+# stop the bfd on one side.
+AT_CHECK([ovs-vsctl set Interface p1 bfd:enable=false], [0])
+# for within 1500ms, the detection timer is not out.
+# there is no change to status.
+for i in `seq 0 1`
+do
+    ovs-appctl time/warp 500
+    BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    for i in `seq 0 5`
+    do
+        AT_CHECK([ovs-ofctl packet-out br1 3 2  "90e2ba01475000101856b2e80806000108000604000100101856b2e80202020300000000000002020202"],
+                 [0], [stdout], [])
+    done
+done
+
+# at 1500ms, the STATE should go DOWN, due to Control Detection Time Expired.
+# but forwarding flag should be still true.
+ovs-appctl time/warp 500
+BFD_CHECK([p0], [true], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+
+# receive packet at 1/100ms rate for 1000ms.
+for i in `seq 0 9`
+do
+    AT_CHECK([ovs-ofctl packet-out br1 3 2  "90e2ba01475000101856b2e80806000108000604000100101856b2e80202020300000000000002020202"],
+             [0], [stdout], [])
+    ovs-appctl time/warp 100
+    # the forwarding flag should always be true during this time.
+    BFD_CHECK([p0], [true], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+done
+
+# reset bfd forwarding_if_rx.
+AT_CHECK([ovs-vsctl set Interface p0 bfd:forwarding_if_rx=false], [0])
+# forwarding flag should turn to false since the STATE is DOWN.
+BFD_CHECK([p0], [false], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+BFD_CHECK_TX([p0], [1000ms], [1000ms], [0ms])
+BFD_CHECK_RX([p0], [500ms], [500ms], [1ms])
+
+# re-enable bfd on the other end. the states should be up.
+AT_CHECK([ovs-vsctl set Interface p1 bfd:enable=true bfd:min_tx=300 bfd:min_rx=300])
+# advance the clock, to stablize the states.
+for i in `seq 0 9`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [Control Detection Time Expired], [none], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [Control Detection Time Expired])
+BFD_CHECK_TX([p0], [500ms], [500ms], [300ms])
+BFD_CHECK_RX([p0], [500ms], [500ms], [300ms])
+
+AT_CHECK([ovs-vsctl del-br br1], [0], [ignore])
+AT_CLEANUP
+
+# forwarding_if_rx Test3: bfd is enabled on both ends of link and decay is enabled.
+AT_SETUP([bfd - bfd forwarding_if_rx 3])
+OVS_VSWITCHD_START([add-br br1 -- set bridge br1 datapath-type=dummy -- \
+                    add-port br1 p1 -- set Interface p1 type=patch \
+                    options:peer=p0 ofport_request=2 -- \
+                    add-port br0 p0 -- set Interface p0 type=patch \
+                    options:peer=p1 ofport_request=1 -- \
+                    set Interface p0 bfd:enable=true bfd:min_tx=300 bfd:min_rx=300 bfd:decay_min_rx=3000 -- \
+                    set Interface p1 bfd:enable=true bfd:min_tx=500 bfd:min_rx=500])
+
+ovs-appctl time/stop
+# advance the clock, to stablize the states.
+for i in `seq 0 19`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [3000ms], [3000ms], [500ms])
+
+# enable forwarding_if_rx.
+AT_CHECK([ovs-vsctl set Interface p0 bfd:forwarding_if_rx=true], [0])
+
+# there should be no change of the forwarding flag, since
+# the bfd on both ends is already up.
+for i in `seq 0 9`
+do
+    ovs-appctl time/warp 500
+    BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+done
+
+# reconfigure the decay_min_rx to 1000ms. check the poll sequence.
+AT_CHECK([ovs-vsctl set interface p0 bfd:decay_min_rx=1000])
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [500ms], [300ms], [500ms])
+
+# wait for 2000ms to decay.
+for i in `seq 0 3`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [final], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [poll], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [1000ms], [1000ms], [500ms])
+
+# wait for 1000ms, so that the flags will go back to none.
+for i in `seq 0 1`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+BFD_CHECK_TX([p0], [500ms], [300ms], [500ms])
+BFD_CHECK_RX([p0], [1000ms], [1000ms], [500ms])
+
+# stop the bfd on one side.
+AT_CHECK([ovs-vsctl set Interface p1 bfd:enable=false], [0])
+# for within 2500ms, the detection timer is not out.
+# there is no change to status.
+for i in `seq 0 4`
+do
+    ovs-appctl time/warp 500
+    BFD_CHECK([p0], [true], [false], [none], [up], [No Diagnostic], [none], [up], [No Diagnostic])
+    AT_CHECK([ovs-ofctl packet-out br1 3 2  "90e2ba01475000101856b2e80806000108000604000100101856b2e80202020300000000000002020202"],
+             [0], [stdout], [])
+done
+
+# at 3000ms, the STATE should go DOWN, due to Control Detection Time Expired.
+# but forwarding flag should be still true.
+ovs-appctl time/warp 500
+BFD_CHECK([p0], [true], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+
+# receive packet at 1/100ms rate for 1000ms.
+for i in `seq 0 9`
+do
+    AT_CHECK([ovs-ofctl packet-out br1 3 2  "90e2ba01475000101856b2e80806000108000604000100101856b2e80202020300000000000002020202"],
+             [0], [stdout], [])
+    ovs-appctl time/warp 100
+    # the forwarding flag should always be true during this time.
+    BFD_CHECK([p0], [true], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+done
+
+# stop receiving for 2000ms.
+for i in `seq 0 19`; do ovs-appctl time/warp 100; done
+BFD_CHECK([p0], [false], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+
+# reset bfd forwarding_if_rx.
+AT_CHECK([ovs-vsctl set Interface p0 bfd:forwarding_if_rx=false])
+# forwarding flag should turn to false since the STATE is DOWN.
+BFD_CHECK([p0], [false], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+BFD_CHECK_TX([p0], [1000ms], [1000ms], [0ms])
+BFD_CHECK_RX([p0], [300ms], [300ms], [1ms])
+
+# re-enable bfd forwarding_if_rx.
+AT_CHECK([ovs-vsctl set Interface p0 bfd:forwarding_if_rx=true])
+# there should be no change.
+BFD_CHECK([p0], [false], [false], [none], [down], [Control Detection Time Expired], [none], [down], [No Diagnostic])
+BFD_CHECK_TX([p0], [1000ms], [1000ms], [0ms])
+BFD_CHECK_RX([p0], [300ms], [300ms], [1ms])
+
+# re-enable bfd on the other end. the states should be up.
+AT_CHECK([ovs-vsctl set Interface p1 bfd:enable=true bfd:min_tx=300 bfd:min_rx=300])
+# advance the clock, to stablize the states.
+for i in `seq 0 9`; do ovs-appctl time/warp 500; done
+BFD_CHECK([p0], [true], [false], [none], [up], [Control Detection Time Expired], [none], [up], [No Diagnostic])
+BFD_CHECK([p1], [true], [false], [none], [up], [No Diagnostic], [none], [up], [Control Detection Time Expired])
+BFD_CHECK_TX([p0], [300ms], [300ms], [300ms])
+BFD_CHECK_RX([p0], [1000ms], [1000ms], [300ms])
+
+AT_CHECK([ovs-vsctl del-br br1], [0], [ignore])
+AT_CLEANUP
