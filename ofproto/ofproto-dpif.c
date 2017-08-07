@@ -6204,18 +6204,16 @@ odp_port_to_ofport(const struct dpif_backer *backer, odp_port_t odp_port)
 {
     struct ofport_dpif *port;
 
-    VLOG_WARN("odp_port_to_ofport\n");
     ovs_rwlock_rdlock(&backer->odp_to_ofport_lock);
+
     HMAP_FOR_EACH_IN_BUCKET (port, odp_port_node, hash_odp_port(odp_port),
                              &backer->odp_to_ofport_map) {
-	VLOG_WARN("odp_port_to_ofport port->odp_port,odp_port = %d %d\n", port->odp_port, odp_port);
         if (port->odp_port == odp_port) {
             ovs_rwlock_unlock(&backer->odp_to_ofport_lock);
-	    VLOG_WARN("Match, return %d\n", port->odp_port);
+	    //VLOG_WARN("odp_port_to_ofport: port found = %d\n", port->odp_port);
             return port;
         }
     }
-
     ovs_rwlock_unlock(&backer->odp_to_ofport_lock);
     return NULL;
 }

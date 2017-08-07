@@ -221,6 +221,12 @@ tnl_port_receive(const struct flow *flow) OVS_EXCLUDED(rwlock)
     ovs_rwlock_rdlock(&rwlock);
     tnl_port = tnl_find(&match);
     ofport = tnl_port ? tnl_port->ofport : NULL;
+    //BN
+    //if (ofport)
+    //	VLOG_WARN("tnl_port_receive: ofport FOUND!\n");
+    //else
+    //	VLOG_WARN("tnl_port_receive: ofport IS NULL!\n");
+
     if (!tnl_port) {
         struct ds ds = DS_EMPTY_INITIALIZER;
 

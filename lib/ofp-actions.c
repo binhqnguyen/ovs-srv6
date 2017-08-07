@@ -2498,6 +2498,4 @@ ofpact_set_field_init(struct ofpact_reg_load *load, const struct mf_field *mf,
     char * tmp = &load->subvalue;
     bitwise_copy(src, mf->n_bytes, load->dst.ofs,
                  &load->subvalue, sizeof load->subvalue, 0, mf->n_bits);
-    //BN
-    VLOG_INFO("BN ofpact_set_field_init, load pointer = %p", &load->subvalue);
 }

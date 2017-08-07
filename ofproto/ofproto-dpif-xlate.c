@@ -524,18 +524,15 @@ xlate_receive(const struct dpif_backer *backer, struct ofpbuf *packet,
         *odp_in_port = flow->in_port.odp_port;
     }
 
-    VLOG_WARN("flow->tunnel.ip_dst != 0 %d\n", flow->tunnel.ip_dst != 0);
-    VLOG_WARN("flow->in_port.odp_port = %d\n", flow->in_port.odp_port);
+    VLOG_WARN("tnl_port_should_receive = %d\n", flow->tunnel.ip_dst != 0);
     xport = xport_lookup(tnl_port_should_receive(flow)
             ? tnl_port_receive(flow)
             : odp_port_to_ofport(backer, flow->in_port.odp_port));
 
     flow->in_port.ofp_port = xport ? xport->ofp_port : OFPP_NONE;
     if (!xport) {
-	VLOG_WARN("!XPORT\n");
+	VLOG_ERR("CAN'T FIND XPORT: ERROR HERE!\n");
         goto exit;
-    } else {
-	VLOG_WARN("Xport ofp_port, odp_port = %d %d\n", xport->ofp_port, xport->odp_port);
     }
 
     if (vsp_adjust_flow(xport->xbridge->ofproto, flow)) {
@@ -2184,7 +2181,7 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
     struct in6_addr last_ipv6;
 
     //BN
-    VLOG_WARN("do_xlate_actions: ofpacts_len = %d\n", ofpacts_len);
+    VLOG_WARN("do_xlate_actions: total actions len = %d\n", ofpacts_len);
     OFPACT_FOR_EACH (a, ofpacts, ofpacts_len) {
         struct ofpact_controller *controller;
         const struct ofpact_metadata *metadata;
@@ -2193,7 +2190,7 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
             break;
         }
 
-    	VLOG_WARN("do_xlate_actions: a->type = %d\n", a->type);
+    	VLOG_WARN("do_xlate_actions: action_len = %d, a->type = %d\n", a->len, a->type);
         switch (a->type) {
         case OFPACT_OUTPUT:
 	    //BN
@@ -2641,7 +2638,8 @@ xlate_actions(struct xlate_in *xin, struct xlate_out *xout)
     } else {
         NOT_REACHED();
     }
-
+	
+    VLOG_WARN("ofpacts_len = %d\n", ofpacts_len);
     ofpbuf_use_stub(&ctx.stack, ctx.init_stack, sizeof ctx.init_stack);
 
     if (mbridge_has_mirrors(ctx.xbridge->mbridge)) {

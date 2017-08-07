@@ -3774,7 +3774,7 @@ add_flow(struct ofproto *ofproto, struct ofconn *ofconn,
     int error;
 
     //BN
-    VLOG_INFO("ofproto.c/add_flow()\n");
+    //VLOG_INFO("ofproto.c/add_flow()\n");
     error = check_table_id(ofproto, fm->table_id);
     if (error) {
         return error;
@@ -5131,7 +5131,7 @@ handle_openflow__(struct ofconn *ofconn, const struct ofpbuf *msg)
     }
 
     //BN
-    VLOG_INFO("BN handle_openflow__ %d\n", type);
+    //VLOG_INFO("BN handle_openflow__ %d\n", type);
     switch (type) {
         /* OpenFlow requests. */
     case OFPTYPE_ECHO_REQUEST:

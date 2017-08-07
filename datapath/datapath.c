@@ -1298,9 +1298,9 @@ static int ovs_flow_cmd_new_or_set(struct sk_buff *skb, struct genl_info *info)
 		goto error;
 	}
 
-	pr_warn("before ovs_lock()\n");
+	//pr_warn("before ovs_lock()\n");
 	ovs_lock();
-	pr_warn("after ovs_lock()\n");
+	//pr_warn("after ovs_lock()\n");
 	dp = get_dp(sock_net(skb->sk), ovs_header->dp_ifindex);
 	error = -ENODEV;
 	if (!dp)

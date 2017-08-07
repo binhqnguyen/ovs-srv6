@@ -1107,8 +1107,6 @@ ofctl_flow_mod(int argc, char *argv[], uint16_t command)
 {
     enum ofputil_protocol usable_protocols;
 
-    //BN
-    VLOG_INFO("BN ofctl_flow_mod\n");
     if (argc > 2 && !strcmp(argv[2], "-")) {
         ofctl_flow_mod_file(argc, argv, command);
     } else {

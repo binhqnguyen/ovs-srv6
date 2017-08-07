@@ -384,7 +384,7 @@ udpif_miss_handler(void *arg)
     struct list misses = LIST_INITIALIZER(&misses);
     struct handler *handler = arg;
 
-    VLOG_WARN("udpif_miss_handler\n");
+    //VLOG_WARN("udpif_miss_handler\n");
     set_subprogram_name("miss_handler");
     for (;;) {
         size_t i;

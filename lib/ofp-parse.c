@@ -856,8 +856,6 @@ str_to_ofpact__(char *pos, char *act, char *arg,
                 enum ofputil_protocol *usable_protocols)
 {
     int code = ofputil_action_code_from_name(act);
-    //BN
-    VLOG_INFO("BN str_to_ofpact__\n");
     if (code >= 0) {
         return parse_named_action(code, arg, ofpacts, usable_protocols);
     } else if (!strcasecmp(act, "drop")) {
@@ -994,8 +992,6 @@ str_to_inst_ofpacts(char *str, struct ofpbuf *ofpacts,
     int prev_type = -1;
     int n_actions = 0;
 
-    //BN
-    VLOG_INFO("BN str_to_inst_ofpacts\n");
     pos = str;
     while (ofputil_parse_key_value(&pos, &inst, &arg)) {
         type = ovs_instruction_type_from_name(inst);
@@ -1042,16 +1038,8 @@ str_to_inst_ofpacts(char *str, struct ofpbuf *ofpacts,
     }
     ofpact_pad(ofpacts);
 
-    //BN: print ofpacts after parsing the command
-    VLOG_INFO("BN str_to_inst_ofpacts, ofpacts raw = \n");
-    int i = 0;
-    while (i <= sizeof(ofpacts)){	
-    	VLOG_INFO("0x%x", *ofpacts);
-	i += 1;
-	ofpacts += 1;
-    }
-
-
+    //BN
+    VLOG_INFO("str_to_inst_ofpacts, ofpacts.size = %d\n", ofpacts->size);
     return NULL;
 }
 

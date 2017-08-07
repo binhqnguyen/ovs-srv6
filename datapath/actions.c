@@ -429,13 +429,13 @@ static int do_output_segments(struct datapath *dp, struct sk_buff *skb, int out_
 	struct vport *vport;
 
 	//BN
-	pr_warn("1. do_output with segments, vport = %d\n", out_port);
+	//pr_warn("1. do_output with segments, vport = %d\n", out_port);
 	if (unlikely(!skb))
 		return -ENOMEM;
 
 	vport = ovs_vport_rcu(dp, out_port);
 	vport->segments = *segments;
-	pr_warn("2. do_output with segments, vport = %d\n", out_port);
+	pr_warn("do_output with segments, vport = %d\n", out_port);
 	if (unlikely(!vport)) {
 		kfree_skb(skb);
 		return -ENODEV;
@@ -615,7 +615,7 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 	     a = nla_next(a, &rem)) {
 		int err = 0;
 
-		pr_warn("do_execute_actions, type = %d, prev_port = %d\n", nla_type(a), prev_port);
+		//pr_warn("do_execute_actions, type = %d, prev_port = %d\n", nla_type(a), prev_port);
 		if (prev_port != -1) {
 			do_output(dp, skb_clone(skb, GFP_ATOMIC), prev_port);
 			prev_port = -1;
@@ -624,7 +624,6 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		switch (nla_type(a)) {
 		case OVS_ACTION_ATTR_OUTPUT:
 			prev_port = nla_get_u32(a);
-			pr_warn("do_execute_actions: ATTR OUTPUT, prev_port = %d\n", prev_port);
 			break;
 
 		case OVS_ACTION_ATTR_USERSPACE:

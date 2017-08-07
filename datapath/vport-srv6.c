@@ -69,7 +69,7 @@ static struct srv6_port *srv6_find_port(struct net *net, __be16 port)
 const struct in6_addr tun_src =
         { { .u6_addr32 = { 0x00000120, 0x00000000, 0xff234020, 0xfe40b7fe } } };
 #ifdef _SR_
-#define OVS_CB_SIZE 40
+#define OVS_CB_SIZE 48
 #define OFFSET_MAC 14
 #endif
 
@@ -375,6 +375,7 @@ static void cpy_ipv6(struct in6_addr *in6_dst, struct ipv6_addr *ipv6_src)
        	in6_dst->in6_u.u6_addr32[3] = ipv6_src->addr[3];
 }
 
+
 static struct sk_buff* encap_pure_packet_to_srv6(struct sk_buff* skb, struct vport *vport)
 {
         struct ethhdr* eth_hdr;
@@ -399,7 +400,7 @@ static struct sk_buff* encap_pure_packet_to_srv6(struct sk_buff* skb, struct vpo
 	
 	
 	if (segments){
-		pr_warn("encap_pure_packet_to_srv6_segments: number of segment = %d\n", segments->segment_used);
+		pr_warn("encap_pure_packet_to_srv6: number of segment = %d\n", segments->segment_used);
 		for (i = 0; i < segments->segment_used; i++){
 			pr_warn("Segment %d: %02x %02x %02x %02x\n", i, segments->ipv6_segments[i].addr[0], segments->ipv6_segments[i].addr[1], segments->ipv6_segments[i].addr[2], segments->ipv6_segments[i].addr[3]);
 		}
@@ -487,7 +488,7 @@ static struct sk_buff* encap_pure_packet_to_srv6(struct sk_buff* skb, struct vpo
 	uint16_t inner_payload_len = 0;
 	struct sk_buff * old_skb;
 	
-	segment_used = segments->segment_used;
+	//segment_used = segments->segment_used;
 	segment_used = 1; //TODO: why would not 3 segments work?
         //BN: TODO: to calculater offset side = outer ipv6 header with SR.
 	offset = 40 + 8 + 16*segment_used; //Outer IPV6 SR header = outer IPV6 header (40B) + SRH (8B) + 1 IPV6 segment (16B).
@@ -499,10 +500,10 @@ static struct sk_buff* encap_pure_packet_to_srv6(struct sk_buff* skb, struct vpo
 #ifdef _SR_
 	pr_warn("encap_pure_packet_to_srv6: offset = %d,  number of segment = %d\n", offset, vport->segments.segment_used);
 #endif
-	pr_warn("skb->cb\n");
-	for (i=0; i < 40; i++){
-		pr_warn("%02X ", skb->cb[i]);
-	}
+	//pr_warn("skb->cb\n");
+	//for (i=0; i < 40; i++){
+	//	pr_warn("%02X ", skb->cb[i]);
+	//}
         start_skb = (unsigned char*)skb->data;
         memcpy(start_skb-offset, start_skb, sizeof(*eth_hdr)); //BN: copy ethernet header over, and leave space for GTP
         memset(start_skb, 0, sizeof(*eth_hdr)); //BN:clear the copied ethernet header in skb.
@@ -523,8 +524,9 @@ static struct sk_buff* encap_pure_packet_to_srv6(struct sk_buff* skb, struct vpo
         outer_iph->nexthdr      = 43; //BN: IPV6 routing.
         outer_iph->hop_limit = inner_iph->hop_limit - 1;
         //BN: test only
-	cpy_ipv6(&outer_iph->daddr, &segments->ipv6_segments[0]);
-        outer_iph->saddr        = tun_dst;
+	//cpy_ipv6(&outer_iph->daddr, &segments->ipv6_segments[0]);
+        outer_iph->daddr        = tun_src;
+        outer_iph->saddr        = tun_src;
 	//BN: SR
 	srh_ipv6 = (struct ipv6_rt_hdr*) (outer_iph+1);
 	//pr_warn("srh_ipv6 start = %02x\n", srh_ipv6);
@@ -551,7 +553,6 @@ static struct sk_buff* encap_pure_packet_to_srv6(struct sk_buff* skb, struct vpo
 
 }
 */
-
 
 static int ovs_tnl_send(struct vport *vport, struct sk_buff *skb)
 {

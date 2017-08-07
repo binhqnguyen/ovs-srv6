@@ -3574,20 +3574,20 @@ commit_odp_set_nw_actions(const struct flow *flow, struct flow *base,
 void
 set_ipv6_segment(struct flow *flow, struct in6_addr *last_dst_ipv6)
 {
-	unsigned char empty[16];
-	int i = 0;
-	for (i = 0; i < 16; i++){
-		empty[i] = 0;
-	}
+	//unsigned char empty[16];
+	//int i = 0;
+	//for (i = 0; i < 16; i++){
+	//	empty[i] = 0;
+	//}
 	if (flow->current_segment < MAX_IPV6_SEGMENTS){
-		VLOG_WARN("flow->current_segment = %d\n", flow->current_segment);
-		for (i = 0; i < 4; i++){
-			VLOG_WARN("flow->ipv6_dst = %02X\n", flow->ipv6_dst.s6_addr32[i]);
-		}
-		if (last_dst_ipv6)
-			for (i = 0; i < 4; i++){
-				VLOG_WARN("last_ipv6_dst = %02X\n", last_dst_ipv6->s6_addr32[i]);
-			}
+		//VLOG_WARN("flow->current_segment = %d\n", flow->current_segment);
+		//for (i = 0; i < 4; i++){
+		//	VLOG_WARN("flow->ipv6_dst = %02X\n", flow->ipv6_dst.s6_addr32[i]);
+		//}
+		//if (last_dst_ipv6)
+			//for (i = 0; i < 4; i++){
+			//	VLOG_WARN("last_ipv6_dst = %02X\n", last_dst_ipv6->s6_addr32[i]);
+			//}
 
 		if (last_dst_ipv6 && memcmp(last_dst_ipv6, &flow->ipv6_dst, sizeof(struct in6_addr)) == 0) {
 			VLOG_WARN("Already encounter this set ipv6_dst\n");
