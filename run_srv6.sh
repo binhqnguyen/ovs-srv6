@@ -1,20 +1,29 @@
 #!/bin/bash
 
+if [ $# -ne 3 ]; then
+        echo "Usage: <sr_inport network name, eg, neta> <sr_outport network  name, eg, netb> <Controller'IP>"
+        exit 1
+else
+        inport_name=$1
+        outport_name=$2
+        CONTROLLER_IP=$3
+fi
+
 ovs-vsctl del-br br0
 
 get_interface="perl /proj/PhantomNet/binh/simeca_scripts/get_interface_map.pl"
-neta=$($get_interface | grep -w neta | awk '{print $3}')
-netb=$($get_interface | grep -w netb | awk '{print $3}')
+sr_inport=$($get_interface | grep -w $inport_name | awk '{print $3}')
+sr_outport=$($get_interface | grep -w $outport_name | awk '{print $3}')
 
 
 ovs-vsctl add-br br0
 #ovs-vsctl set-fail-mode br0 standalone
 ovs-vsctl set-fail-mode br0 secure
-ifconfig $neta 0.0.0.0
-ifconfig $netb 0.0.0.0
+ifconfig $sr_inport 0.0.0.0
+ifconfig $sr_outport 0.0.0.0
 
-ovs-vsctl add-port br0 $neta
-ovs-vsctl  add-port br0 $netb
+ovs-vsctl add-port br0 $sr_inport
+ovs-vsctl  add-port br0 $sr_outport
 ovs-vsctl set bridge br0 protocols=OpenFlow10,OpenFlow12,OpenFlow13
 
 
@@ -30,5 +39,5 @@ ovs-vsctl add-port br0 srv62 -- set interface srv62 type=srv6 options:remote_ip=
 ovs-vsctl add-port br0 srv63 -- set interface srv63 type=srv6 options:remote_ip=flow options:local_ip=flow options:in_key=flow options:out_key=flow options:dst_port=2154
 
 
-./utilities/ovs-vsctl set-controller br0 tcp:127.0.0.1
+./utilities/ovs-vsctl set-controller br0 tcp:$CONTROLLER_IP
 ovs-vsctl show

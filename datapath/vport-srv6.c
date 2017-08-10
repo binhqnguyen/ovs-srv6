@@ -384,7 +384,7 @@ static struct sk_buff* encap_pure_packet_to_srv6(struct sk_buff* skb, struct vpo
         struct ipv6hdr* inner_iph;
         uint8_t sr_header_len = 0;
 	struct ipv6_segments *segments = &vport->segments; //BN: READ ONLY?
-	uint8_t i = 0;
+	int i = 0;
 	uint8_t segment_used;
 	uint16_t header_size = 0;
 	uint16_t full_len = 0;
@@ -450,8 +450,8 @@ static struct sk_buff* encap_pure_packet_to_srv6(struct sk_buff* skb, struct vpo
 	srh_ipv6->type = 4;
 	srh_ipv6->segments_left = segment_used-1;
 	memset(srh_ipv6+1, 0, sizeof(uint32_t));
-	for (i = 0; i < segment_used; i++){
-		memcpy(srh_ipv6+2+i*sizeof(struct in6_addr)/4, &segments->ipv6_segments[i], sizeof(struct in6_addr));
+	for (i = segment_used-1; i >= 0; i--){
+		memcpy(srh_ipv6+2+(segment_used-1-i)*sizeof(struct in6_addr)/4, &segments->ipv6_segments[i], sizeof(struct in6_addr)); //Reversed order
 	}
 
 	//original inner ip header
