@@ -26,18 +26,20 @@ class parameters(object):
 	out_port = 0
 	ipv6_dst = 0
 	sr_mac = 0
+	dst_mac = 0
 	segs = []
 
-	def __init__(self, in_port = 0, out_port = 0, ipv6_dst = 0, sr_mac = 0, segs = None):
+	def __init__(self, in_port = 0, out_port = 0, ipv6_dst = 0, sr_mac = 0, dst_mac = 0, segs = None):
 		self.in_port = in_port
 		self.out_port = out_port
 		self.ipv6_dst = ipv6_dst
 		self.sr_mac = sr_mac
+		self.dst_mac = dst_mac
 		self.segs = segs
 
 	def print_me(self):
 		print "========parameters========="
-		print "in_port=%s,out_port=%s,ipv6_dst=%s,sr_mac=%s,segs=%s" % (self.in_port, self.out_port, self.ipv6_dst, self.sr_mac, self.segs)
+		print "in_port=%s,out_port=%s,ipv6_dst=%s,sr_mac=%s,dst_mac=%s,segs=%s" % (self.in_port, self.out_port, self.ipv6_dst, self.sr_mac, self.dst_mac, self.segs)
 
 class SMORE_controller(app_manager.RyuApp):
 	IPV6_TYPE = 0x86DD	
@@ -57,15 +59,20 @@ class SMORE_controller(app_manager.RyuApp):
 	OVS_SR_MAC = { "0":"00:04:23:b7:12:da",	#n2's neta mac
 			 "1":"00:04:23:b7:19:71"	#n3's nete mac
 			}
+	OVS_DST_MAC = { 
+			 "0":"00:04:23:b7:1a:0a",	#n0's net1 mac
+			"1":"00:04:23:b7:26:60"        #n6's net2 mac
+			}
+
 	#2->4->3, 3->4->2
-	#OVS_SEGS = { "0":["2001::204:204:23ff:feb7:12da", "2001::206:204:23ff:fea8:da63", "2001::207:204:23ff:feb7:2101"],	#n2'neta, n4's netc, n3's netd
-	#		 "1":["2001::208:204:23ff:feb7:1971","2001::207:204:23ff:fea8:da62", "2001::206:204:23ff:feb7:1311"] #n3's nete, n4's netd, n2's netc
-	#		}
+	OVS_SEGS = { "0":["2001::204:204:23ff:feb7:12da", "2001::206:204:23ff:fea8:da63", "2001::207:204:23ff:feb7:2101"],	#n2'neta, n4's netc, n3's netd
+			 "1":["2001::208:204:23ff:feb7:1971","2001::207:204:23ff:fea8:da62", "2001::206:204:23ff:feb7:1311"] #n3's nete, n4's netd, n2's netc
+			}
 
 	#2->3, 3->2
-	OVS_SEGS = { "0":["2001::204:204:23ff:feb7:12da", "2001::205:204:23ff:feb7:2100"],	#n2'neta, n3's netb
-			 "1":["2001::208:204:23ff:feb7:1971","2001::205:204:23ff:feb7:12db"] #n3's nete, n2's netb
-			}
+	#OVS_SEGS = { "0":["2001::204:204:23ff:feb7:12da", "2001::205:204:23ff:feb7:2100"],	#n2'neta, n3's netb
+	#		 "1":["2001::208:204:23ff:feb7:1971","2001::205:204:23ff:feb7:12db"] #n3's nete, n2's netb
+	#		}
 
 
 
@@ -78,7 +85,7 @@ class SMORE_controller(app_manager.RyuApp):
 			if self.OVS_ADDR[i] == ovs_address:
 				ovs = "%s" % i
 				break
-		return parameters(in_port = self.OVS_INPORT[i], out_port = self.OVS_OUTPORT[i], ipv6_dst = self.OVS_IPV6_DST[i], sr_mac = self.OVS_SR_MAC[i], segs = self.OVS_SEGS[i])
+		return parameters(in_port = self.OVS_INPORT[i], out_port = self.OVS_OUTPORT[i], ipv6_dst = self.OVS_IPV6_DST[i], sr_mac = self.OVS_SR_MAC[i], dst_mac = self.OVS_DST_MAC[i], segs = self.OVS_SEGS[i])
 
 	def _add_flow(self, datapath, priority, match, actions):
 	      ofproto = datapath.ofproto
@@ -118,7 +125,7 @@ class SMORE_controller(app_manager.RyuApp):
 	    print "******Pushing returning dst flow on: %s ....." % datapath.address[0] #returning, in the out_port, out the in_port
 	    match = parser.OFPMatch(in_port=parameters.out_port)
 	    actions = []
-	    #actions.append(parser.OFPActionSetField(eth_dst=parameters.sr_mac))
+	    actions.append(parser.OFPActionSetField(eth_dst=parameters.dst_mac))
 	    actions.append(parser.OFPActionOutput(parameters.in_port))
 	    self._add_flow(datapath,3,match,actions)
 
