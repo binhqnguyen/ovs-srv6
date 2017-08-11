@@ -42,7 +42,8 @@ class parameters(object):
 		print "in_port=%s,out_port=%s,ipv6_dst=%s,sr_mac=%s,dst_mac=%s,segs=%s" % (self.in_port, self.out_port, self.ipv6_dst, self.sr_mac, self.dst_mac, self.segs)
 
 class SMORE_controller(app_manager.RyuApp):
-	IPV6_TYPE = 0x86DD	
+	ARP_REQUEST_TYPE = 0x0806 
+	IPV6_TYPE = 0x86DD
 	SRV6_PORT = 5
 	OVS_ADDR = {	"0":"127.0.0.1",
 			"1":"155.98.39.68"
@@ -128,6 +129,19 @@ class SMORE_controller(app_manager.RyuApp):
 	    actions.append(parser.OFPActionSetField(eth_dst=parameters.dst_mac))
 	    actions.append(parser.OFPActionOutput(parameters.in_port))
 	    self._add_flow(datapath,3,match,actions)
+
+	    print "*******Pushing Neighbor Solicite request/reply flow on: %s ********" % datapath.address[0]
+	    match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SMORE_controller.IPV6_TYPE, ipv6_dst=("ff02::1:ff00:0000","ffff:ffff:ffff:ffff:ffff:ffff:ff00:0000"))
+	    actions = []
+	    actions.append(parser.OFPActionOutput(parameters.out_port))
+	    self._add_flow(datapath,3,match,actions)
+
+	    match = parser.OFPMatch(in_port=parameters.out_port,eth_type=SMORE_controller.IPV6_TYPE, ipv6_dst=("ff02::1:ffb7:2661","ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"))
+	    actions = []
+	    actions.append(parser.OFPActionOutput(parameters.in_port))
+	    self._add_flow(datapath,3,match,actions)
+
+
 
 
 
