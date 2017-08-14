@@ -1,4 +1,4 @@
-# Copyright (C) 2011 Nippon Telegraph and Telephone Corporation.
+# Copyright (C) 2017 Binh Nguyen binh@cs.utah.edu.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,9 @@ from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
+from collections import defaultdict
+
+DEBUG = 0
 
 class parameters(object):
 	in_port = 0
@@ -44,31 +47,35 @@ class parameters(object):
 class SMORE_controller(app_manager.RyuApp):
 	ARP_REQUEST_TYPE = 0x0806 
 	IPV6_TYPE = 0x86DD
+	PARAMETER_FILE = "/opt/net_info.sh"
 	SRV6_PORT = 5
-	OVS_ADDR = {	"0":"127.0.0.1",
-			"1":"155.98.39.68"
-			}
+	OVS_ADDR = {}
 	OVS_INPORT = { "0":1,
 			"1":1
 			}
 	OVS_OUTPORT = { "0":2,
 			"1":2
 			}
-	OVS_IPV6_DST = { "0":"2001::209:204:23ff:feb7:2660", #n6's net2
-			 "1":"2001::203:204:23ff:feb7:1a0a" #n0's net1
-			}
-	OVS_SR_MAC = { "0":"00:04:23:b7:12:da",	#n2's neta mac
-			 "1":"00:04:23:b7:19:71"	#n3's nete mac
-			}
-	OVS_DST_MAC = { 
-			 "0":"00:04:23:b7:1a:0a",	#n0's net1 mac
-			"1":"00:04:23:b7:26:60"        #n6's net2 mac
-			}
+	OVS_IPV6_DST = {}
+	OVS_SR_MAC = {}
+	OVS_DST_MAC = {}
+	OVS_SEGS = defaultdict(list)
+
+	#OVS_IPV6_DST = { "0":"2001::208:204:23ff:feb7:2660", #n6's net2
+	#		 "1":"2001::204:204:23ff:feb7:1a0a" #n0's net1
+	#		}
+	#OVS_SR_MAC = { "0":"00:04:23:b7:12:da",	#n2's neta mac
+	#		 "1":"00:04:23:b7:19:71"	#n3's nete mac
+	#		}
+	#OVS_DST_MAC = { 
+	#		 "0":"00:04:23:b7:1a:0a",	#n0's net1 mac
+	#		"1":"00:04:23:b7:26:60"        #n6's net2 mac
+	#		}
 
 	#2->4->3, 3->4->2
-	OVS_SEGS = { "0":["2001::204:204:23ff:feb7:12da", "2001::206:204:23ff:fea8:da63", "2001::207:204:23ff:feb7:2101"],	#n2'neta, n4's netc, n3's netd
-			 "1":["2001::208:204:23ff:feb7:1971","2001::207:204:23ff:fea8:da62", "2001::206:204:23ff:feb7:1311"] #n3's nete, n4's netd, n2's netc
-			}
+	#OVS_SEGS = { "0":["2001::204:204:23ff:feb7:12da", "2001::206:204:23ff:fea8:da63", "2001::207:204:23ff:feb7:2101"],	#n2'neta, n4's netc, n3's netd
+	#		 "1":["2001::208:204:23ff:feb7:1971","2001::207:204:23ff:fea8:da62", "2001::206:204:23ff:feb7:1311"] #n3's nete, n4's netd, n2's netc
+	#		}
 
 	#2->3, 3->2
 	#OVS_SEGS = { "0":["2001::204:204:23ff:feb7:12da", "2001::205:204:23ff:feb7:2100"],	#n2'neta, n3's netb
@@ -77,8 +84,63 @@ class SMORE_controller(app_manager.RyuApp):
 
 
 
+	def _extract_value(self, keyword, l):
+		k = "%s="%keyword
+		if k in l:
+			return l.split("=")[1][1:-2]
+		else:
+			return None
+
+	def fetch_parameters_from_file(self):
+	 	for l in open(self.PARAMETER_FILE, "read").readlines():
+			if self._extract_value("n1_pub", l):
+				self.OVS_ADDR["0"] = self._extract_value("n1_pub", l)
+			if self._extract_value("n5_pub", l):
+				self.OVS_ADDR["1"] = self._extract_value("n5_pub", l)
 
 
+			if self._extract_value("n6_2", l):
+				self.OVS_IPV6_DST["0"] = self._extract_value("n6_2", l)
+			if self._extract_value("n0_1", l):
+				self.OVS_IPV6_DST["1"] = self._extract_value("n0_1", l)
+
+			if self._extract_value("n2_a_mac", l):
+				self.OVS_SR_MAC["0"] = self._extract_value("n2_a_mac", l)
+			if self._extract_value("n3_e_mac", l):
+				self.OVS_SR_MAC["1"] = self._extract_value("n3_e_mac", l)
+
+			if self._extract_value("n0_1_mac", l):
+				self.OVS_DST_MAC["0"] = self._extract_value("n0_1_mac", l)
+			if self._extract_value("n6_2_mac", l):
+				self.OVS_DST_MAC["1"] = self._extract_value("n6_2_mac", l)
+
+			#segments 2->3, 3->2
+			if self._extract_value("n2_a", l):
+				self.OVS_SEGS["0"].append(self._extract_value("n2_a", l))
+			if self._extract_value("n3_b", l):
+				self.OVS_SEGS["0"].append(self._extract_value("n3_b", l))
+
+			if self._extract_value("n3_e", l):
+				self.OVS_SEGS["1"].append(self._extract_value("n3_e", l))
+			if self._extract_value("n2_b", l):
+				self.OVS_SEGS["1"].append(self._extract_value("n2_b", l))
+			'''
+			#segments 2->4->3, 3->4->2
+			if self._extract_value("n2_a", l):
+				self.OVS_SEGS["0"].append(self._extract_value("n2_a", l))
+			if self._extract_value("n4_c", l):
+				self.OVS_SEGS["0"].append(self._extract_value("n4_c", l))
+			if self._extract_value("n3_d", l):
+				self.OVS_SEGS["0"].append(self._extract_value("n3_d", l))
+
+
+			if self._extract_value("n3_e", l):
+				self.OVS_SEGS["1"].append(self._extract_value("n3_e", l))
+			if self._extract_value("n4_d", l):
+				self.OVS_SEGS["1"].append(self._extract_value("n4_d", l))
+			if self._extract_value("n2_c", l):
+				self.OVS_SEGS["1"].append(self._extract_value("n2_c", l))
+			'''
 
 	def get_parameters(self, ovs_address):
 		ovs = "1"
@@ -105,8 +167,9 @@ class SMORE_controller(app_manager.RyuApp):
 		$OVS_OFCTL add-flow br0 in_port=$ENCAP,eth_type=$IPV6_TYPE,ipv6_dst="2001::204:23ff:feb7:17be",priority=2,actions=mod_dl_dst:"00:04:23:b7:17:be",output:$NETB	
 	    '''
 
-	    print "******Pushing SR flows on: %s ....." % datapath.address[0]
-	    parameters.print_me()
+	    print "******Pushing SR flows on: %s *******" % datapath.address[0]
+	    if DEBUG == 1:
+		parameters.print_me()
 
 	    #1
 	    match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SMORE_controller.IPV6_TYPE,ipv6_dst="%s"%parameters.ipv6_dst)
@@ -123,50 +186,30 @@ class SMORE_controller(app_manager.RyuApp):
 	    actions.append(parser.OFPActionOutput(parameters.out_port))
 	    self._add_flow(datapath,3,match,actions)
 
-	    print "******Pushing returning dst flow on: %s ....." % datapath.address[0] #returning, in the out_port, out the in_port
-	    match = parser.OFPMatch(in_port=parameters.out_port)
-	    actions = []
-	    actions.append(parser.OFPActionSetField(eth_dst=parameters.dst_mac))
-	    actions.append(parser.OFPActionOutput(parameters.in_port))
-	    self._add_flow(datapath,3,match,actions)
-
-	    print "*******Pushing Neighbor Solicite request/reply flow on: %s ********" % datapath.address[0]
-	    match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SMORE_controller.IPV6_TYPE, ipv6_dst=("ff02::1:ff00:0000","ffff:ffff:ffff:ffff:ffff:ffff:ff00:0000"))
+	    print "*******Pushing bridging flows for all others IPv6 packets (eg, neighbor solicitation) on: %s ********" % datapath.address[0]
+	    match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SMORE_controller.IPV6_TYPE)
 	    actions = []
 	    actions.append(parser.OFPActionOutput(parameters.out_port))
-	    self._add_flow(datapath,3,match,actions)
+	    self._add_flow(datapath,0,match,actions) #lowest priority
 
-	    match = parser.OFPMatch(in_port=parameters.out_port,eth_type=SMORE_controller.IPV6_TYPE, ipv6_dst=("ff02::1:ffb7:2661","ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"))
+
+	    match = parser.OFPMatch(in_port=parameters.out_port,eth_type=SMORE_controller.IPV6_TYPE)
 	    actions = []
 	    actions.append(parser.OFPActionOutput(parameters.in_port))
-	    self._add_flow(datapath,3,match,actions)
+	    self._add_flow(datapath,0,match,actions)	#lowest priority
 
 
-
-
-
-	
-	    '''
-	    #1
-	    match = parser.OFPMatch(in_port=SMORE_controller.NETA_PORT,eth_type=SMORE_controller.IPV6_TYPE,ipv6_dst="2001::211:43ff:fee4:9720")
-	    actions = []
-            actions.append(parser.OFPActionSetField(ipv6_dst=SMORE_controller.SEG1))
-            actions.append(parser.OFPActionSetField(ipv6_dst=SMORE_controller.SEG2))
-            actions.append(parser.OFPActionSetField(ipv6_dst=SMORE_controller.SEG3))
-	    actions.append(parser.OFPActionOutput(SMORE_controller.SRV6_PORT))
-	    self._add_flow(datapath,3,match,actions)
-
-	    #2
-	    match = parser.OFPMatch(in_port=SMORE_controller.SRV6_PORT)
-	    actions = []
-	    actions.append(parser.OFPActionSetField(eth_dst=SMORE_controller.SR_MAC))
-	    actions.append(parser.OFPActionOutput(SMORE_controller.NETB_PORT))
-	    self._add_flow(datapath,3,match,actions)
-            '''
-	
 
 	def __init__(self, *args, **kwargs):
 		super(SMORE_controller, self).__init__(args, kwargs)
+		self.fetch_parameters_from_file()
+		if DEBUG == 1:
+			print "Fetched information from file: %s" %self.PARAMETER_FILE
+			print "OVS_IPV6_DST %s" % self.OVS_IPV6_DST
+			print "OVS_SR_MAC %s" % self.OVS_SR_MAC
+			print "OVS_DST_MAC %s" % self.OVS_DST_MAC
+			print "OVS_SEGS %s" % self.OVS_SEGS
+			print "OVS_ADDR %s" % self.OVS_ADDR
 		print "Controller started."
 
 	def __del__(self):
