@@ -60,6 +60,8 @@ class SMORE_controller(app_manager.RyuApp):
 	OVS_SR_MAC = {}
 	OVS_DST_MAC = {}
 	OVS_SEGS = defaultdict(list)
+	IS_SHORTEST_PATH = "0"
+	ALL_PARAMETERS = {}
 
 	#OVS_IPV6_DST = { "0":"2001::208:204:23ff:feb7:2660", #n6's net2
 	#		 "1":"2001::204:204:23ff:feb7:1a0a" #n0's net1
@@ -82,6 +84,22 @@ class SMORE_controller(app_manager.RyuApp):
 	#		 "1":["2001::208:204:23ff:feb7:1971","2001::205:204:23ff:feb7:12db"] #n3's nete, n2's netb
 	#		}
 
+
+	def del_flows(self, datapath):
+	    empty_match = datapath.ofproto_parser.OFPMatch()
+	    instructions = []
+	    table_id = 0 #remove flows in table 0 only!!
+	    ofproto = datapath.ofproto
+	    flow_mod = datapath.ofproto_parser.OFPFlowMod(datapath, 0, 0, table_id,
+                                                    ofproto.OFPFC_DELETE, 0, 0,
+                                                    1,
+                                                    ofproto.OFPCML_NO_BUFFER,
+                                                    ofproto.OFPP_ANY,
+                                                    ofproto.OFPG_ANY, 0,
+                                                    empty_match, instructions)
+
+	    print "[C] Deleting all flow entries in table %s of OVS %s" % (table_id, datapath.address[0])
+	    datapath.send_msg(flow_mod)
 
 
 	def _extract_value(self, keyword, l):
@@ -114,33 +132,30 @@ class SMORE_controller(app_manager.RyuApp):
 			if self._extract_value("n6_2_mac", l):
 				self.OVS_DST_MAC["1"] = self._extract_value("n6_2_mac", l)
 
+			if self._extract_value("IS_SHORTEST_PATH",l):
+				self.IS_SHORTEST_PATH = self._extract_value("IS_SHORTEST_PATH", l)
+
+			if "#" not in l:
+		        	[key, value] = l.split("=")
+				self.ALL_PARAMETERS[key] = value[1:-2]
+
+	def _construct_segments(self):
+		if self.IS_SHORTEST_PATH == "1":
 			#segments 2->3, 3->2
-			if self._extract_value("n2_a", l):
-				self.OVS_SEGS["0"].append(self._extract_value("n2_a", l))
-			if self._extract_value("n3_b", l):
-				self.OVS_SEGS["0"].append(self._extract_value("n3_b", l))
+			self.OVS_SEGS["0"].append(self.ALL_PARAMETERS["n2_a"])
+			self.OVS_SEGS["0"].append(self.ALL_PARAMETERS["n3_b"])
 
-			if self._extract_value("n3_e", l):
-				self.OVS_SEGS["1"].append(self._extract_value("n3_e", l))
-			if self._extract_value("n2_b", l):
-				self.OVS_SEGS["1"].append(self._extract_value("n2_b", l))
-			'''
+			self.OVS_SEGS["1"].append(self.ALL_PARAMETERS["n3_e"])
+			self.OVS_SEGS["1"].append(self.ALL_PARAMETERS["n2_b"])
+		else:
 			#segments 2->4->3, 3->4->2
-			if self._extract_value("n2_a", l):
-				self.OVS_SEGS["0"].append(self._extract_value("n2_a", l))
-			if self._extract_value("n4_c", l):
-				self.OVS_SEGS["0"].append(self._extract_value("n4_c", l))
-			if self._extract_value("n3_d", l):
-				self.OVS_SEGS["0"].append(self._extract_value("n3_d", l))
+			self.OVS_SEGS["0"].append(self.ALL_PARAMETERS["n2_a"])
+			self.OVS_SEGS["0"].append(self.ALL_PARAMETERS["n4_c"])
+			self.OVS_SEGS["0"].append(self.ALL_PARAMETERS["n3_d"])
 
-
-			if self._extract_value("n3_e", l):
-				self.OVS_SEGS["1"].append(self._extract_value("n3_e", l))
-			if self._extract_value("n4_d", l):
-				self.OVS_SEGS["1"].append(self._extract_value("n4_d", l))
-			if self._extract_value("n2_c", l):
-				self.OVS_SEGS["1"].append(self._extract_value("n2_c", l))
-			'''
+			self.OVS_SEGS["1"].append(self.ALL_PARAMETERS["n3_e"])
+			self.OVS_SEGS["1"].append(self.ALL_PARAMETERS["n4_d"])
+			self.OVS_SEGS["1"].append(self.ALL_PARAMETERS["n2_c"])
 
 	def get_parameters(self, ovs_address):
 		ovs = "1"
@@ -167,7 +182,11 @@ class SMORE_controller(app_manager.RyuApp):
 		$OVS_OFCTL add-flow br0 in_port=$ENCAP,eth_type=$IPV6_TYPE,ipv6_dst="2001::204:23ff:feb7:17be",priority=2,actions=mod_dl_dst:"00:04:23:b7:17:be",output:$NETB	
 	    '''
 
-	    print "******Pushing SR flows on: %s *******" % datapath.address[0]
+	    print "[C] Pushing SR flows on OVS: %s" % datapath.address[0]
+	    if self.IS_SHORTEST_PATH == "1":
+		print "[C] Installing Segment Routing Rules: USING shortest path!"
+	    else:
+		print "[C] Installing Segment Routing Rules: NOT USING shortest path!"
 	    if DEBUG == 1:
 		parameters.print_me()
 
@@ -186,7 +205,7 @@ class SMORE_controller(app_manager.RyuApp):
 	    actions.append(parser.OFPActionOutput(parameters.out_port))
 	    self._add_flow(datapath,3,match,actions)
 
-	    print "*******Pushing bridging flows for all others IPv6 packets (eg, neighbor solicitation) on: %s ********" % datapath.address[0]
+	    print "[C] Pushing bridging flows for all other IPV6 packets on OVS: %s" % datapath.address[0]
 	    match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SMORE_controller.IPV6_TYPE)
 	    actions = []
 	    actions.append(parser.OFPActionOutput(parameters.out_port))
@@ -203,6 +222,7 @@ class SMORE_controller(app_manager.RyuApp):
 	def __init__(self, *args, **kwargs):
 		super(SMORE_controller, self).__init__(args, kwargs)
 		self.fetch_parameters_from_file()
+		self._construct_segments()
 		if DEBUG == 1:
 			print "Fetched information from file: %s" %self.PARAMETER_FILE
 			print "OVS_IPV6_DST %s" % self.OVS_IPV6_DST
@@ -210,7 +230,9 @@ class SMORE_controller(app_manager.RyuApp):
 			print "OVS_DST_MAC %s" % self.OVS_DST_MAC
 			print "OVS_SEGS %s" % self.OVS_SEGS
 			print "OVS_ADDR %s" % self.OVS_ADDR
-		print "Controller started."
+			print "IS_SHORTEST_PATH %s" % self.IS_SHORTEST_PATH
+			print "ALL %s" % self.ALL_PARAMETERS
+		print "[C] Controller started."
 
 	def __del__(self):
 		thread.exit()
@@ -222,6 +244,7 @@ class SMORE_controller(app_manager.RyuApp):
 		parser = datapath.ofproto_parser
 		ovs_address = datapath.address[0]
 		parameters = self.get_parameters(ovs_address)
+		self.del_flows(datapath)
 		self._push_flows_sr_ryu(parser, datapath, parameters)
 
 if __name__ == "__main__":
