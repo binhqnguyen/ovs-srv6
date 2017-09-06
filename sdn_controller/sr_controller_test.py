@@ -13,14 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#!/usr/bin/python
+
 from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
+from ryu.controller import dpset
+from ryu.app.wsgi import ControllerBase, WSGIApplication
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from collections import defaultdict
+from ofctl_rest_listener import SR_rest_api
 
 DEBUG = 0
 
@@ -44,7 +49,13 @@ class parameters(object):
 		print "========parameters========="
 		print "in_port=%s,out_port=%s,ipv6_dst=%s,sr_mac=%s,dst_mac=%s,segs=%s" % (self.in_port, self.out_port, self.ipv6_dst, self.sr_mac, self.dst_mac, self.segs)
 
-class SMORE_controller(app_manager.RyuApp):
+class SR_controller(app_manager.RyuApp):
+#class SR_controller(ControllerBase):
+    	_CONTEXTS = {
+        	'dpset': dpset.DPSet,
+        	'wsgi': WSGIApplication,
+    	}
+	NUM_OF_OVS_SWITCHES = 1
 	ARP_REQUEST_TYPE = 0x0806 
 	IPV6_TYPE = 0x86DD
 	PARAMETER_FILE = "/opt/net_info.sh"
@@ -191,28 +202,28 @@ class SMORE_controller(app_manager.RyuApp):
 		parameters.print_me()
 
 	    #1
-	    match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SMORE_controller.IPV6_TYPE,ipv6_dst="%s"%parameters.ipv6_dst)
+	    match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SR_controller.IPV6_TYPE,ipv6_dst="%s"%parameters.ipv6_dst)
 	    actions = []
 	    for segment in parameters.segs:
             	actions.append(parser.OFPActionSetField(ipv6_dst=segment))
-	    actions.append(parser.OFPActionOutput(SMORE_controller.SRV6_PORT))
+	    actions.append(parser.OFPActionOutput(SR_controller.SRV6_PORT))
 	    self._add_flow(datapath,3,match,actions)
 
 	    #2
-	    match = parser.OFPMatch(in_port=SMORE_controller.SRV6_PORT)
+	    match = parser.OFPMatch(in_port=SR_controller.SRV6_PORT)
 	    actions = []
 	    actions.append(parser.OFPActionSetField(eth_dst=parameters.sr_mac))
 	    actions.append(parser.OFPActionOutput(parameters.out_port))
 	    self._add_flow(datapath,3,match,actions)
 
 	    print "[C] Pushing bridging flows for all other IPV6 packets on OVS: %s" % datapath.address[0]
-	    match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SMORE_controller.IPV6_TYPE)
+	    match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SR_controller.IPV6_TYPE)
 	    actions = []
 	    actions.append(parser.OFPActionOutput(parameters.out_port))
 	    self._add_flow(datapath,0,match,actions) #lowest priority
 
 
-	    match = parser.OFPMatch(in_port=parameters.out_port,eth_type=SMORE_controller.IPV6_TYPE)
+	    match = parser.OFPMatch(in_port=parameters.out_port,eth_type=SR_controller.IPV6_TYPE)
 	    actions = []
 	    actions.append(parser.OFPActionOutput(parameters.in_port))
 	    self._add_flow(datapath,0,match,actions)	#lowest priority
@@ -220,7 +231,9 @@ class SMORE_controller(app_manager.RyuApp):
 
 
 	def __init__(self, *args, **kwargs):
-		super(SMORE_controller, self).__init__(args, kwargs)
+		super(SR_controller, self).__init__(args, kwargs)
+        	self.dpset = kwargs['dpset']
+        	self.wsgi = kwargs['wsgi']
 		self.fetch_parameters_from_file()
 		self._construct_segments()
 		if DEBUG == 1:
@@ -246,7 +259,17 @@ class SMORE_controller(app_manager.RyuApp):
 		parameters = self.get_parameters(ovs_address)
 		self.del_flows(datapath)
 		self._push_flows_sr_ryu(parser, datapath, parameters)
+		print self.dpset.get_all()
+		if len(self.dpset.get_all()) == self.NUM_OF_OVS_SWITCHES-1:
+			try:
+				SR_rest_api(dpset=self.dpset, wsgi=self.wsgi);
+				print "Rest NB API started."
+			except Exception, e:
+				print "Error when start the NB API: %s" % e
 
+
+
+	
 if __name__ == "__main__":
 	#Testing Sniffer
 	'''
