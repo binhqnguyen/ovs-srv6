@@ -51,10 +51,10 @@ class parameters(object):
 
 class SR_controller(app_manager.RyuApp):
 #class SR_controller(ControllerBase):
-    	_CONTEXTS = {
+    _CONTEXTS = {
         	'dpset': dpset.DPSet,
         	'wsgi': WSGIApplication,
-    	}
+    }
 	NUM_OF_OVS_SWITCHES = 1
 	ARP_REQUEST_TYPE = 0x0806 
 	IPV6_TYPE = 0x86DD
@@ -73,6 +73,7 @@ class SR_controller(app_manager.RyuApp):
 	OVS_SEGS = defaultdict(list)
 	IS_SHORTEST_PATH = "0"
 	ALL_PARAMETERS = {}
+	dpid_to_datapath = {}
 
 	#OVS_IPV6_DST = { "0":"2001::208:204:23ff:feb7:2660", #n6's net2
 	#		 "1":"2001::204:204:23ff:feb7:1a0a" #n0's net1
@@ -259,11 +260,14 @@ class SR_controller(app_manager.RyuApp):
 		parameters = self.get_parameters(ovs_address)
 		self.del_flows(datapath)
 		self._push_flows_sr_ryu(parser, datapath, parameters)
+		self.dpid_to_datapath[datapath.id] = datapath
 		print self.dpset.get_all()
 		if len(self.dpset.get_all()) == self.NUM_OF_OVS_SWITCHES-1:
 			try:
 				SR_rest_api(dpset=self.dpset, wsgi=self.wsgi);
-				print "Rest NB API started."
+				print "[C] Rest NB API listener started."
+				SR_flows_mgmt(self.dpid_to_datapath)
+				print "[C] Rest NB API flow manager started."
 			except Exception, e:
 				print "Error when start the NB API: %s" % e
 

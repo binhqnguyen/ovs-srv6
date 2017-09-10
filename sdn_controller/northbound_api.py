@@ -27,6 +27,9 @@ from ryu.lib.packet import ethernet
 from collections import defaultdict
 import logging
 from webob import Response
+from northbound_match import Match as Match
+from northbound_actions import Actions as Actions
+from sr_flows_mgmt import SR_flows_mgmt as SR_flows_mgmt
 
 LOG = logging.getLogger('ryu.app.ofctl_rest_listener')
 LOG.setLevel(logging.INFO)
@@ -40,28 +43,53 @@ class North_api(ControllerBase):
 	#NORTH BOUND API - REST
 	def delete_single_flow(self, req, **_kwargs):
 		post = req.POST
-    		if len(post) != 2 or "src_ip" not in post or "dst_ip" not in post:
+    		if len(post) < 2 or "dpid" not in post:
         		LOG.info("INVALID POST values: %s" % post)
         		return Response(status=404)
 
-    		src_ip = post['src_ip']
-		dst_ip = post['dst_ip']
+		match = Match.parse_match_fields(post['match'])
+        dpid = post['dpid']
+        
 		if DEBUG:
-			LOG.debug("RECEIVED NB API: delete_single_flow")
-		return Response(status=200)
+			LOG.debug("RECEIVED NB API: delete_single_flow: (dpid, match) = (%s, %s)" % (dpid, match) )
+        if SR_flows_mgmt.delete_single_flow(dpid, match):
+		  return Response(status=200)
+        return Response(status=500)
 
 	#Usage: curl --data "src_ip=1&dst_ip=2" http://0.0.0.0:8080/sr/insert
 	def insert_single_flow(self, req, **_kwargs):
-		post = req.POST
-    		if len(post) != 2 or "src_ip" not in post or "dst_ip" not in post:
-        		LOG.info("INVALID POST values: %s" % post)
-        		return Response(status=404)
+        post = req.POST
+            if len(post) < 3 or "actions" not in post or "dpid" not in post:
+                LOG.info("INVALID POST values: %s" % post)
+                return Response(status=404)
 
-    		src_ip = post['src_ip']
-		dst_ip = post['dst_ip']
-		if DEBUG:
-			LOG.debug("RECEIVED NB API: insert_single_flow")
+        actions = Actions.parse_actions_fields(post['actions'])
+        match = Match.parse_match_fields(post['match'])
+        dpid = post['dpid']
+        priority = 0
+        if post['priority']:
+            priority = int(post['priority'])
 
+        if DEBUG:
+            LOG.debug("RECEIVED NB API: insert_single_flow: (dpid, match, actions) = (%s,%s,%s)" % (dpid, match, actions)) 
+        if SR_flows_mgmt.insert_single_flow(dpid, priority, match, actions):
+          return Response(status=200)
+        return Response(status=500)
+
+    #NORTH BOUND API - REST
+    def delete_all_flows(self, req, **_kwargs):
+        post = req.POST
+            if len(post) < 1 or "dpid" not in post:
+                LOG.info("INVALID POST values: %s" % post)
+                return Response(status=404)
+
+        dpid = post['dpid']
+        
+        if DEBUG:
+            LOG.debug("RECEIVED NB API: delete_all_flows: (dpid) = (%s)" % (dpid) )
+        if SR_flows_mgmt.delete_all_flows(dpid):
+          return Response(status=200)
+        return Response(status=500)
 
 
 

@@ -81,16 +81,23 @@ class SR_rest_api(app_manager.RyuApp):
         mapper = wsgi.mapper
 
         wsgi.registory['North_api'] = self.data
-        path = '/sr'
+        
 
-        uri = path + '/delete'
-        mapper.connect('sr', uri,
+        flow_mgmt = "flow_mgmt"
+        flow_mgmt_path = '/%s' % flow_mgmt
+        #Usage: curl --data "dpid=123455&match='in_port=1,out_port=2'" http://0.0.0.0:8080/sr/delete
+        uri = flow_mgmt_path + '/delete'
+        mapper.connect(flow_mgmt, uri,
                        controller=North_api, action='delete_single_flow',
-                       conditions=dict(method=['GET']))
+                       conditions=dict(method=['POST']))
 
+        uri = flow_mgmt_path + '/delete_all_flows'
+        mapper.connect(flow_mgmt, uri,
+                       controller=North_api, action='delete_all_flows',
+                       conditions=dict(method=['POST']))
 
-        uri = path + '/insert'
-        mapper.connect('sr', uri,
+        uri = flow_mgmt_path + '/insert'
+        mapper.connect(flow_mgmt, uri,
                        controller=North_api, action='insert_single_flow',
                        conditions=dict(method=['POST']))
 
