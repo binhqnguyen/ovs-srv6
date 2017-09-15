@@ -43,15 +43,21 @@ class North_api(ControllerBase):
 	def delete_single_flow(self, req, **_kwargs):
 		post = req.POST
 		M = Match()
+                SR = SR_flows_mgmt()
     		if len(post) < 2 or "dpid" not in post:
         		LOG.info("INVALID POST values: %s" % post)
         		return Response(status=404)
 
 		match = M.parse_match_fields(post['match'])
         	dpid = post['dpid']
-        
+        	priority = 0
+        	if 'priority' in post:
+            		priority = int(post['priority'])
+
+
 		LOG.debug("RECEIVED NB API: delete_single_flow: (dpid, match) = (%s, %s)" % (dpid, match) )
-        	if SR_flows_mgmt.delete_single_flow(dpid, match):
+        	if SR.delete_single_flow(dpid, priority, match):
+			LOG.info("Deleted a flow.")
 			return Response(status=200)
         	return Response(status=500)
 
@@ -77,24 +83,25 @@ class North_api(ControllerBase):
 			LOG.error("Actions or match fields are empty: actions = %s, match = %s" % (actions, match))
 			return Response(status = 500)
         	if not SR.insert_single_flow(dpid, priority, match, actions):
-			LOG.info("Inserted flow.")
+			LOG.info("Inserted a flow.")
           		return Response(status=200)
 		else:
-			LOG.error("Can't insert single flow!")
+			LOG.error("Can't insert a flow!")
         		return Response(status=500)
 
-    #NORTH BOUND API - REST
+        #NORTH BOUND API - REST
     	def delete_all_flows(self, req, **_kwargs):
         	post = req.POST
-            	if len(post) < 1 or "dpid" not in post:
+		SR = SR_flows_mgmt()
+            	if len(post) != 1 or "dpid" not in post:
                 	LOG.info("INVALID POST values: %s" % post)
                 	return Response(status=404)
 
         	dpid = post['dpid']
         
-        	if DEBUG:
-            		LOG.debug("RECEIVED NB API: delete_all_flows: (dpid) = (%s)" % (dpid) )
-        	if SR_flows_mgmt.delete_all_flows(dpid):
+            	LOG.debug("RECEIVED NB API: delete_all_flows: (dpid) = (%s)" % (dpid) )
+        	if SR.delete_all_flows(dpid):
+			LOG.info("Deleted all flows in switch %s." % dpid)
           		return Response(status=200)
         	return Response(status=500)
 

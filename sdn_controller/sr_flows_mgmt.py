@@ -33,7 +33,7 @@ LOG.setLevel(logging.DEBUG)
 class SR_flows_mgmt(object):
   dpid_to_datapath = {}
 
-  def del_flows(self, datapath):
+  def _del_flows(self, datapath):
       empty_match = datapath.ofproto_parser.OFPMatch()
       instructions = []
       table_id = 0 #remove flows in table 0 only!!
@@ -46,8 +46,20 @@ class SR_flows_mgmt(object):
                                                     ofproto.OFPG_ANY, 0,
                                                     empty_match, instructions)
 
-      LOG.info("Deleting all flow entries in table %s of OVS %s" % (table_id, datapath.address[0]))
+      LOG.debug("Deleting all flow entries in table %s of OVS %s" % (table_id, datapath.address[0]))
       datapath.send_msg(flow_mod)
+
+  def _delete_flow(self,datapath, priority, match):
+      instructions = []
+      flow_mod = datapath.ofproto_parser.OFPFlowMod(
+            datapath,
+            priority=priority,
+            out_port=1,
+            out_group=ofproto.OFPG_ANY,
+            command=datapath.ofproto.OFPFC_DELETE_STRICT,
+            match=match)
+      datapath.send_msg(flow_mod)
+
 
 
   def _add_flow(self, datapath, priority, match, actions):
@@ -117,12 +129,23 @@ class SR_flows_mgmt(object):
     self._add_flow(datapath,priority,m,a)
     return 0
 
-  def delete_single_flow(self, dpid, match):
+  def delete_single_flow(self, dpid, priority, match):
     LOG.info("delete_single_flow, (dpid, match)=(%s, %s)" % (dpid, match))
+    datapath, parser = self._get_datapath_from_dpid(dpid)
+    if not datapath:
+      LOG.error("Could not find datapth from dpid %s" % dpid)
+      return 1
+
+    m = self._construct_match(parser, match)
+    LOG.debug("delete_single_flow (match, priority, datapath)=(%s,%s,%s)" % (m, priority, datapath))
+    self._delete_flow(datapath,priority,m)
+    return 0
+
+
     return
 
   def delete_all_flows(self, dpid):
     datapath, parser = self._get_datapath_from_dpid(dpid)
-    self.del_flows(self, datapath)
-    return
+    self._del_flows(datapath)
+    return 0
 ###########################################################
