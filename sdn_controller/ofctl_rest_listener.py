@@ -11,6 +11,8 @@
 #WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #See the License for the specific language governing permissions and
 #limitations under the License.
+
+#!/usr/bin/python
 import logging
 
 import json
@@ -70,8 +72,7 @@ class SR_rest_api(app_manager.RyuApp):
     }
     def __init__(self, *args, **kwargs):
         super(SR_rest_api, self).__init__(*args, **kwargs)
-	if DEBUG:
-        	LOG.info("Init SR_rest_api")
+        LOG.debug("Init SR_rest_api")
         self.dpset = kwargs['dpset']
         wsgi = kwargs['wsgi']
         self.waiters = {}
@@ -85,7 +86,7 @@ class SR_rest_api(app_manager.RyuApp):
 
         flow_mgmt = "flow_mgmt"
         flow_mgmt_path = '/%s' % flow_mgmt
-        #Usage: curl --data "dpid=123455&match='in_port=1,out_port=2'" http://0.0.0.0:8080/sr/delete
+        #Usage: curl --data "dpid=123455&match='in_port=1,out_port=2'" http://0.0.0.0:8080/flow_mgmt/delete
         uri = flow_mgmt_path + '/delete'
         mapper.connect(flow_mgmt, uri,
                        controller=North_api, action='delete_single_flow',

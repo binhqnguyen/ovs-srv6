@@ -15,6 +15,9 @@
 
 #!/usr/bin/python
 
+import logging
+LOG = logging.getLogger('ryu.app.Match')
+LOG.setLevel(logging.DEBUG)
 
 class Match(object):
 
@@ -28,26 +31,31 @@ class Match(object):
   }
   
   def get_match_fields(self):
-    return match_fields
+  	return match_fields
 
   def parse_match_fields(self, str):
-    tokens = str.split(',')
-    for t in tokens:
-      key = t.split("=")[0]
-      value = t.split("=")[1]
-      if key in self.match_fields:
-        self.match_fields[key] = value
-      else:
-        print "Key %s: isn't supported!" % key
-    return self.match_fields
+	LOG.debug("Match.parse_match_field, str=%s" % str)
+  	tokens = str.split(',')
+  	for t in tokens:
+		try:
+      			key = t.split("=")[0]
+      			value = t.split("=")[1]
+		except:
+			LOG.error("Invalid match field: %s" % t)
+			return None
+
+      		if key in self.match_fields:
+        		self.match_fields[key] = value
+      		else:
+        		LOG.warn("Key isn't supported: %s" % key)
+    	return self.match_fields
 
   def __init__(self, **kwagrs):
-    for key in kwagrs:
-      self.match_fields[key] = kwagrs[key]
+  	for key in kwagrs:
+      		self.match_fields[key] = kwagrs[key]
     
 
   def print_me(self):
-    print "Match_fields -> value":
-    for key in self.match_fields:
-      print "%s -> %s" % (key, self.match_fields[key])
-    
+  	LOG.info("Match_fields -> value")
+    	for key in self.match_fields:
+      		LOG.info("%s -> %s" % (key, self.match_fields[key]))

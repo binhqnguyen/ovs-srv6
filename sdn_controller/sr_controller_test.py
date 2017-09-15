@@ -26,35 +26,16 @@ from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from collections import defaultdict
 from ofctl_rest_listener import SR_rest_api
+from sr_flows_mgmt import SR_flows_mgmt
+from parameters import *
 
 DEBUG = 0
 
-class parameters(object):
-	in_port = 0
-	out_port = 0
-	ipv6_dst = 0
-	sr_mac = 0
-	dst_mac = 0
-	segs = []
-
-	def __init__(self, in_port = 0, out_port = 0, ipv6_dst = 0, sr_mac = 0, dst_mac = 0, segs = None):
-		self.in_port = in_port
-		self.out_port = out_port
-		self.ipv6_dst = ipv6_dst
-		self.sr_mac = sr_mac
-		self.dst_mac = dst_mac
-		self.segs = segs
-
-	def print_me(self):
-		print "========parameters========="
-		print "in_port=%s,out_port=%s,ipv6_dst=%s,sr_mac=%s,dst_mac=%s,segs=%s" % (self.in_port, self.out_port, self.ipv6_dst, self.sr_mac, self.dst_mac, self.segs)
-
 class SR_controller(app_manager.RyuApp):
-#class SR_controller(ControllerBase):
-    _CONTEXTS = {
+    	_CONTEXTS = {
         	'dpset': dpset.DPSet,
         	'wsgi': WSGIApplication,
-    }
+    	}
 	NUM_OF_OVS_SWITCHES = 1
 	ARP_REQUEST_TYPE = 0x0806 
 	IPV6_TYPE = 0x86DD
@@ -266,10 +247,11 @@ class SR_controller(app_manager.RyuApp):
 			try:
 				SR_rest_api(dpset=self.dpset, wsgi=self.wsgi);
 				print "[C] Rest NB API listener started."
-				SR_flows_mgmt(self.dpid_to_datapath)
+				SR_flows_mgmt.set_dpid_to_datapath(self.dpid_to_datapath)
 				print "[C] Rest NB API flow manager started."
 			except Exception, e:
 				print "Error when start the NB API: %s" % e
+
 
 
 

@@ -25,11 +25,12 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from collections import defaultdict
-from ofctl_rest_listener import SR_rest_api
 
 DEBUG = 0
 
-class SR_flows_mgmt(ControllerBase):
+#class SR_flows_mgmt(ControllerBase):
+class SR_flows_mgmt(object):
+  dpid_to_datapath = {}
   NUM_OF_OVS_SWITCHES = 1
   ARP_REQUEST_TYPE = 0x0806 
   IPV6_TYPE = 0x86DD
@@ -65,7 +66,7 @@ class SR_flows_mgmt(ControllerBase):
   #    "1":["2001::208:204:23ff:feb7:1971","2001::207:204:23ff:fea8:da62", "2001::206:204:23ff:feb7:1311"] #n3's nete, n4's netd, n2's netc
   #   }
 
-  #2->3, 3->2
+  #flows_mgmt2->3, 3->2
   #OVS_SEGS = { "0":["2001::204:204:23ff:feb7:12da", "2001::205:204:23ff:feb7:2100"], #n2'neta, n3's netb
   #    "1":["2001::208:204:23ff:feb7:1971","2001::205:204:23ff:feb7:12db"] #n3's nete, n2's netb
   #   }
@@ -123,7 +124,7 @@ class SR_flows_mgmt(ControllerBase):
 
       if "#" not in l:
               [key, value] = l.split("=")
-        self.ALL_PARAMETERS[key] = value[1:-2]
+      self.ALL_PARAMETERS[key] = value[1:-2]
 
   def _construct_segments(self):
     if self.IS_SHORTEST_PATH == "1":
@@ -170,83 +171,86 @@ class SR_flows_mgmt(ControllerBase):
 
 
   def _push_flows_sr_ryu(self, parser, datapath, parameters):
-      '''
-    $OVS_OFCTL add-flow br0 in_port=$NETA,priority=2,eth_type=$IPV6_TYPE,ipv6_dst="2001::211:43ff:fee4:9720",actions="set_field:2001::204:23ff:feb7:17be->ipv6_dst",output:$ENCAP
-    $OVS_OFCTL add-flow br0 in_port=$ENCAP,eth_type=$IPV6_TYPE,ipv6_dst="2001::204:23ff:feb7:17be",priority=2,actions=mod_dl_dst:"00:04:23:b7:17:be",output:$NETB 
-      '''
+      	'''
+    	$OVS_OFCTL add-flow br0 in_port=$NETA,priority=2,eth_type=$IPV6_TYPE,ipv6_dst="2001::211:43ff:fee4:9720",actions="set_field:2001::204:23ff:feb7:17be->ipv6_dst",output:$ENCAP
+    	$OVS_OFCTL add-flow br0 in_port=$ENCAP,eth_type=$IPV6_TYPE,ipv6_dst="2001::204:23ff:feb7:17be",priority=2,actions=mod_dl_dst:"00:04:23:b7:17:be",output:$NETB 
+      	'''
 
-      print "[C] Pushing SR flows on OVS: %s" % datapath.address[0]
-      if self.IS_SHORTEST_PATH == "1":
-    print "[C] Installing Segment Routing Rules: USING shortest path!"
-      else:
-    print "[C] Installing Segment Routing Rules: NOT USING shortest path!"
-      if DEBUG == 1:
-    parameters.print_me()
+    	print "[C] Pushing SR flows on OVS: %s" % datapath.address[0]
+      	if self.IS_SHORTEST_PATH == "1":
+    		print "[C] Installing Segment Routing Rules: USING shortest path!"
+      	else:
+   		print "[C] Installing Segment Routing Rules: NOT USING shortest path!"
+      	if DEBUG == 1:
+    		parameters.print_me()
 
-      #1
-      match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SR_controller.IPV6_TYPE,ipv6_dst="%s"%parameters.ipv6_dst)
-      actions = []
-      for segment in parameters.segs:
+      	#1
+      	match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SR_flows_mgmt.IPV6_TYPE,ipv6_dst="%s"%parameters.ipv6_dst)
+      	actions = []
+      	for segment in parameters.segs:
               actions.append(parser.OFPActionSetField(ipv6_dst=segment))
-      actions.append(parser.OFPActionOutput(SR_controller.SRV6_PORT))
-      self._add_flow(datapath,3,match,actions)
+      	actions.append(parser.OFPActionOutput(SR_flows_mgmt.SRV6_PORT))
+      	self._add_flow(datapath,3,match,actions)
 
-      #2
-      match = parser.OFPMatch(in_port=SR_controller.SRV6_PORT)
-      actions = []
-      actions.append(parser.OFPActionSetField(eth_dst=parameters.sr_mac))
-      actions.append(parser.OFPActionOutput(parameters.out_port))
-      self._add_flow(datapath,3,match,actions)
+      	#2
+      	match = parser.OFPMatch(in_port=SR_flows_mgmt.SRV6_PORT)
+      	actions = []
+      	actions.append(parser.OFPActionSetField(eth_dst=parameters.sr_mac))
+      	actions.append(parser.OFPActionOutput(parameters.out_port))
+      	self._add_flow(datapath,3,match,actions)
 
-      print "[C] Pushing bridging flows for all other IPV6 packets on OVS: %s" % datapath.address[0]
-      match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SR_controller.IPV6_TYPE)
-      actions = []
-      actions.append(parser.OFPActionOutput(parameters.out_port))
-      self._add_flow(datapath,0,match,actions) #lowest priority
-
-
-      match = parser.OFPMatch(in_port=parameters.out_port,eth_type=SR_controller.IPV6_TYPE)
-      actions = []
-      actions.append(parser.OFPActionOutput(parameters.in_port))
-      self._add_flow(datapath,0,match,actions)  #lowest priority
+      	print "[C] Pushing bridging flows for all other IPV6 packets on OVS: %s" % datapath.address[0]
+      	match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SR_flows_mgmt.IPV6_TYPE)
+      	actions = []
+      	actions.append(parser.OFPActionOutput(parameters.out_port))
+      	self._add_flow(datapath,0,match,actions) #lowest priority
 
 
+      	match = parser.OFPMatch(in_port=parameters.out_port,eth_type=SR_flows_mgmt.IPV6_TYPE)
+      	actions = []
+      	actions.append(parser.OFPActionOutput(parameters.in_port))
+      	self._add_flow(datapath,0,match,actions)  #lowest priority
+
+
+  @staticmethod
+  def set_dpid_to_datapath(dpid_to_datapath):
+  	SR_flows_mgmt.dpid_to_datapath = dpid_to_datapath
 
   def __init__(self, *args, **kwargs):
-    super(SR_controller, self).__init__(args, kwargs)
-    self.dpid_to_datapath = kwargs['dpid_to_datapath']
-    self.fetch_parameters_from_file()
-    self._construct_segments()
-    self.del_flows(self.datapath)
-    if DEBUG == 1:
-      print "Fetched information from file: %s" %self.PARAMETER_FILE
-      print "OVS_IPV6_DST %s" % self.OVS_IPV6_DST
-      print "OVS_SR_MAC %s" % self.OVS_SR_MAC
-      print "OVS_DST_MAC %s" % self.OVS_DST_MAC
-      print "OVS_SEGS %s" % self.OVS_SEGS
-      print "OVS_ADDR %s" % self.OVS_ADDR
-      print "IS_SHORTEST_PATH %s" % self.IS_SHORTEST_PATH
-      print "ALL %s" % self.ALL_PARAMETERS
-    print "[C] Controller started."
+    super(SR_flows_mgmt, self).__init__(*args, **kwargs)
+    #self.dpid_to_datapath = kwargs['dpid_to_datapath']
+    #self.fetch_parameters_from_file()
+    #self._construct_segments()
+    #self.del_flows(self.datapath)
+    #if DEBUG == 1:
+    #  print "Fetched information from file: %s" %self.PARAMETER_FILE
+    #  print "OVS_IPV6_DST %s" % self.OVS_IPV6_DST
+    #  print "OVS_SR_MAC %s" % self.OVS_SR_MAC
+    #  print "OVS_DST_MAC %s" % self.OVS_DST_MAC
+    #  print "OVS_SEGS %s" % self.OVS_SEGS
+    #  print "OVS_ADDR %s" % self.OVS_ADDR
+    #  print "IS_SHORTEST_PATH %s" % self.IS_SHORTEST_PATH
+    #  print "ALL %s" % self.ALL_PARAMETERS
+    #print "[C] SR flow manager started."
 
-  def __del__(self):
-    thread.exit()
 
 ###############################
 #NORTHBOUND API implementations
 ################################
   def insert_single_flow(self, dpid, priority, match, actions):
-    parser, datapath = self._get_datapath_from_dpid(dpid)
+    datapath, parser = self._get_datapath_from_dpid(dpid)
     if not datapath:
       print "[ERROR] Could not find datapth from dpid %s" % dpid
       return
+
+    #TODO: how to construct a match and actions here? potentially the fields could be "*" (empty).
     match = parser.OFPMatch(
       in_port=match['in_port'],
       eth_type=SR_flows_mgmt.IPV6_TYPE,
       ipv6_dst="%s"%match['nw_dst'],
       ipv6_src="%s"%match['nw_src'],
-      dl_dst="%s"%match['dl_dst'],
-      dl_src="%s"%match['dl_src'],
+      eth_dst="%s"%match['dl_dst'],
+      eth_src="%s"%match['dl_src']
     )
     a = []
     for segment in actions['ipv6_dst']:
@@ -263,7 +267,7 @@ class SR_flows_mgmt(ControllerBase):
     return
 
   def delete_all_flows(self, dpid):
-    parser, datapath = self._get_datapath_from_dpid(dpid)
+    datapath, parser = self._get_datapath_from_dpid(dpid)
     self.del_flows(self, datapath)
     return
 ###########################################################

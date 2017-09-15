@@ -15,7 +15,11 @@
 
 #!/usr/bin/python
 
+import logging
+LOG = logging.getLogger('ryu.app.Actions')
+LOG.setLevel(logging.INFO)
 
+DEBUG = 1
 class Actions(object):
 
   actions_fields = { #all supported actions fields. eg, curl -d "actions="ipv6_dst=::01,mod_dl_src="AA:BB:CC:DD:EE:FF""
@@ -27,19 +31,27 @@ class Actions(object):
   def get_actions_fields(self):
     return actions_fields
 
-  def parse_actions_fields(self, str):
+  def parse_actions_fields(self,str):
+    LOG.debug("parse_actions_fields, str=%s" % str)
+
     tokens = str.split(',')
     for t in tokens:
-      key = t.split("=")[0]
-      value = t.split("=")[1]
-      if key in self.actions_fields:
+      try:
+      	key = t.split("=")[0]
+      	value = t.split("=")[1]
+      except:
+	LOG.error("Invalid actions: %s" % t)
+	return None
+
+      if key in Actions.actions_fields:
         if key == "ipv6_dst":
-          self.actions_fields[key].append(value)
+          Actions.actions_fields[key].append(value)
         else:
-          self.actions_fields[key] = value
+          Actions.actions_fields[key] = value
       else:
-        print "Key %s: isn't supported!" % key
-    return self.actions_fields
+        LOG.warn("Key isn't supported: %s" % key)
+	
+    return Actions.actions_fields
 
   def __init__(self, **kwagrs):
     for key in kwagrs:
@@ -50,7 +62,7 @@ class Actions(object):
     
 
   def print_me(self):
-    print "Actions_fields -> value":
+    print "Actions_fields -> value"
     for key in self.actions_fields:
       print "%s -> %s" % (key, self.actions_fields[key])
     
