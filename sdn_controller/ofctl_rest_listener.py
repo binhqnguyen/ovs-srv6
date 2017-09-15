@@ -38,7 +38,6 @@ from northbound_api import North_api
 
 LOG = logging.getLogger('ryu.app.ofctl_rest_listener')
 LOG.setLevel(logging.DEBUG)
-DEBUG = 1
 
 # supported ofctl versions in this restful app
 supported_ofctl = {
@@ -48,22 +47,6 @@ supported_ofctl = {
 }
 
 # REST API LISTENER FOR SR CONTROLLER
-#
-#
-# get the list of all switches
-# POST /iot/attach/c2s
-# eg, curl -X POST -d arg1=value1 -d arg2=value2 http://<DISPATCHER's IP>:8080/iot/attach/c2s
-#
-# Install P2P IoT Flow
-# POST /iot/attach/p2p
-#
-# Install C2S HO Flow
-# POST /iot/ho/c2s
-#
-# Install P2P HO Flow
-# POST /iot/ho/p2p
-#
-
 
 class SR_rest_api(app_manager.RyuApp):
     _CONTEXTS = {
@@ -86,7 +69,6 @@ class SR_rest_api(app_manager.RyuApp):
 
         flow_mgmt = "flow_mgmt"
         flow_mgmt_path = '/%s' % flow_mgmt
-        #Usage: curl --data "dpid=123455&match='in_port=1,out_port=2'" http://0.0.0.0:8080/flow_mgmt/delete
         uri = flow_mgmt_path + '/delete'
         mapper.connect(flow_mgmt, uri,
                        controller=North_api, action='delete_single_flow',
@@ -97,18 +79,12 @@ class SR_rest_api(app_manager.RyuApp):
                        controller=North_api, action='delete_all_flows',
                        conditions=dict(method=['POST']))
 
+
+	#Usage: curl --data 'dpid=17779080870&match=ipv6_dst=2001::204:23ff:feb7:1e40,eth_type=0x86DD&actions=ipv6_dst=2001::208:204:23ff:feb7:1e40,ipv6_dst=2001::208:204:23ff:feb7:1e41,ipv6_dst=2001::208:204:23ff:feb7:1e42,output=1' http://0.0.0.0:8080/flow_mgmt/insert
         uri = flow_mgmt_path + '/insert'
         mapper.connect(flow_mgmt, uri,
                        controller=North_api, action='insert_single_flow',
                        conditions=dict(method=['POST']))
-
-    '''
-    Initialize this SR controller's information.
-    '''
-    def _init_sr_controller_info(self, kwargs):
-	if DEBUG:
-        	LOG.info("Init SR controller's info")
-
 
 
     @set_ev_cls([ofp_event.EventOFPStatsReply,

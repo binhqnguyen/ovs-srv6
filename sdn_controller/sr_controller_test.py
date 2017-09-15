@@ -240,9 +240,10 @@ class SR_controller(app_manager.RyuApp):
 		ovs_address = datapath.address[0]
 		parameters = self.get_parameters(ovs_address)
 		self.del_flows(datapath)
-		self._push_flows_sr_ryu(parser, datapath, parameters)
+		#self._push_flows_sr_ryu(parser, datapath, parameters)
 		self.dpid_to_datapath[datapath.id] = datapath
 		print self.dpset.get_all()
+		print datapath.id
 		if len(self.dpset.get_all()) == self.NUM_OF_OVS_SWITCHES-1:
 			try:
 				SR_rest_api(dpset=self.dpset, wsgi=self.wsgi);

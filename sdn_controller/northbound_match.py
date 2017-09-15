@@ -17,17 +17,18 @@
 
 import logging
 LOG = logging.getLogger('ryu.app.Match')
-LOG.setLevel(logging.DEBUG)
+LOG.setLevel(logging.INFO)
 
 class Match(object):
 
   match_fields = { #all supported match fields. eg, curl -d "match="in_port=1,out_port=2,nw_src=::01""
-  "in_port": "*",
-  "out_port": "*",
-  "nw_src": "*",
-  "nw_dst": "*",
-  "dl_src": "*",
-  "dl_dst": "*"
+  "in_port": None,
+  "eth_type": None,
+  "out_port": None,
+  "ipv6_src": None,
+  "ipv6_dst": None,
+  "dl_src": None,
+  "dl_dst": None
   }
   
   def get_match_fields(self):
@@ -51,6 +52,9 @@ class Match(object):
     	return self.match_fields
 
   def __init__(self, **kwagrs):
+	super(Match, self).__init__()
+	for key in self.match_fields:
+		self.match_fields[key] = None
   	for key in kwagrs:
       		self.match_fields[key] = kwagrs[key]
     

@@ -32,14 +32,12 @@ from northbound_actions import Actions as Actions
 from sr_flows_mgmt import SR_flows_mgmt as SR_flows_mgmt
 
 
-LOG = logging.getLogger('ryu.app.ofctl_rest_listener')
+LOG = logging.getLogger('ryu.app.North_api')
 LOG.setLevel(logging.INFO)
-DEBUG = 1
 
 class North_api(ControllerBase):
 	def __init__(self, req, link, data, **config):
 		super(North_api, self).__init__(req, link, data, **config)
-		#super(North_api, self).__init__(args, kwargs)
 
 	#NORTH BOUND API - REST
 	def delete_single_flow(self, req, **_kwargs):
@@ -52,8 +50,7 @@ class North_api(ControllerBase):
 		match = M.parse_match_fields(post['match'])
         	dpid = post['dpid']
         
-		if DEBUG:
-			LOG.debug("RECEIVED NB API: delete_single_flow: (dpid, match) = (%s, %s)" % (dpid, match) )
+		LOG.debug("RECEIVED NB API: delete_single_flow: (dpid, match) = (%s, %s)" % (dpid, match) )
         	if SR_flows_mgmt.delete_single_flow(dpid, match):
 			return Response(status=200)
         	return Response(status=500)
@@ -79,7 +76,8 @@ class North_api(ControllerBase):
 		if not actions or not match:
 			LOG.error("Actions or match fields are empty: actions = %s, match = %s" % (actions, match))
 			return Response(status = 500)
-        	if SR.insert_single_flow(dpid, priority, match, actions):
+        	if not SR.insert_single_flow(dpid, priority, match, actions):
+			LOG.info("Inserted flow.")
           		return Response(status=200)
 		else:
 			LOG.error("Can't insert single flow!")
