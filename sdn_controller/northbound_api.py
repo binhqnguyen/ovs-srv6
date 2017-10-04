@@ -105,5 +105,11 @@ class North_api(ControllerBase):
           		return Response(status=200)
         	return Response(status=500)
 
+	#NORTH BOUND API - OSPF MONITOR
+	def receive_ospf_lsa(self, req, **_kwargs):
+		post = req.POST
+		#ospf_monitor = OSPF_monitor()
+		LOG.info("RECEIVED NB API: receive_ospf_lsa: %s" % post)
+		return Response(status=500)
 
 
