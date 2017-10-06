@@ -33,10 +33,7 @@ LOG.setLevel(logging.DEBUG)
 class OSPF_monitor(object):
 
   def __init__(self, *args, **kwargs):
-    super(OSPF_monitor, self).__init__(*args, **kwargs)
+	super(OSPF_monitor, self).__init__(*args, **kwargs)
 
-
-###########################################################
-#OSPF LSA listener
-##########################################################
-  def ospf_receive(self, ):
+  def ospf_receive(self):
+	return

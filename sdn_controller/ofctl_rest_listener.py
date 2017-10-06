@@ -68,6 +68,8 @@ class SR_rest_api(app_manager.RyuApp):
         
 
         flow_mgmt = "flow_mgmt"
+	ospf_monitor = "ospf_monitor"
+	ospf_monitor_path = "/%s" % ospf_monitor
         flow_mgmt_path = '/%s' % flow_mgmt
         uri = flow_mgmt_path + '/delete'
         mapper.connect(flow_mgmt, uri,
@@ -85,6 +87,12 @@ class SR_rest_api(app_manager.RyuApp):
         mapper.connect(flow_mgmt, uri,
                        controller=North_api, action='insert_single_flow',
                        conditions=dict(method=['POST']))
+
+        uri = ospf_monitor_path + '/lsa_put'
+        mapper.connect(ospf_monitor, uri,
+                       controller=North_api, action='receive_ospf_lsa',
+                       conditions=dict(method=['POST']))
+
 
 
     @set_ev_cls([ofp_event.EventOFPStatsReply,

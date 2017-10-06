@@ -30,6 +30,7 @@ from webob import Response
 from northbound_match import Match as Match
 from northbound_actions import Actions as Actions
 from sr_flows_mgmt import SR_flows_mgmt as SR_flows_mgmt
+from ospf_monitor import *
 
 
 LOG = logging.getLogger('ryu.app.North_api')
@@ -109,7 +110,12 @@ class North_api(ControllerBase):
 	def receive_ospf_lsa(self, req, **_kwargs):
 		post = req.POST
 		#ospf_monitor = OSPF_monitor()
-		LOG.info("RECEIVED NB API: receive_ospf_lsa: %s" % post)
+		#LOG.info("post len = %s" % len(post))
+		for k in post:
+			LOG.info("post[%s]=%s" % (k, post[k]));
+		#LOG.info("post = %s" % post)
+		#LOG.info("RECEIVED NB API: receive_ospf_lsa: %s" % post)
+		LOG.info("RECEIVED NB API: receive_ospf_lsa")
 		return Response(status=500)
 
 
