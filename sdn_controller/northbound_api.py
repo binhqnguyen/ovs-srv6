@@ -113,9 +113,8 @@ class North_api(ControllerBase):
 		#LOG.info("post len = %s" % len(post))
 		for k in post:
 			LOG.info("post[%s]=%s" % (k, post[k]));
-		#LOG.info("post = %s" % post)
-		#LOG.info("RECEIVED NB API: receive_ospf_lsa: %s" % post)
-		LOG.info("RECEIVED NB API: receive_ospf_lsa")
+		LOG.info("RECEIVED NB API: receive_ospf_lsa: %s" % post)
+		#LOG.info("RECEIVED NB API: receive_ospf_lsa")
 		return Response(status=500)
 
 

@@ -35,6 +35,7 @@ from ryu.app.wsgi import ControllerBase, WSGIApplication
 from collections import defaultdict
 
 from northbound_api import North_api
+from TE.te_controller import Te_controller
 
 LOG = logging.getLogger('ryu.app.ofctl_rest_listener')
 LOG.setLevel(logging.DEBUG)
@@ -90,7 +91,7 @@ class SR_rest_api(app_manager.RyuApp):
 
         uri = ospf_monitor_path + '/lsa_put'
         mapper.connect(ospf_monitor, uri,
-                       controller=North_api, action='receive_ospf_lsa',
+                       controller=Te_controller, action='receive_ospf_lsa',
                        conditions=dict(method=['POST']))
 
 
