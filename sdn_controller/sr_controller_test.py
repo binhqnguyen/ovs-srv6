@@ -28,6 +28,10 @@ from collections import defaultdict
 from ofctl_rest_listener import SR_rest_api
 from sr_flows_mgmt import SR_flows_mgmt
 from parameters import *
+import logging
+
+LOG = logging.getLogger('ryu.app.SR_controller')
+LOG.setLevel(logging.INFO)
 
 DEBUG = 0
 
@@ -91,7 +95,7 @@ class SR_controller(app_manager.RyuApp):
                                                     ofproto.OFPG_ANY, 0,
                                                     empty_match, instructions)
 
-	    print "[C] Deleting all flow entries in table %s of OVS %s" % (table_id, datapath.address[0])
+	    LOG.info("Deleting all flow entries in table %s of OVS %s" % (table_id, datapath.address[0]))
 	    datapath.send_msg(flow_mod)
 
 
@@ -175,11 +179,11 @@ class SR_controller(app_manager.RyuApp):
 		$OVS_OFCTL add-flow br0 in_port=$ENCAP,eth_type=$IPV6_TYPE,ipv6_dst="2001::204:23ff:feb7:17be",priority=2,actions=mod_dl_dst:"00:04:23:b7:17:be",output:$NETB	
 	    '''
 
-	    print "[C] Pushing SR flows on OVS: %s" % datapath.address[0]
+	    LOG.info("Pushing SR flows on OVS: %s" % datapath.address[0])
 	    if self.IS_SHORTEST_PATH == "1":
-		print "[C] Installing Segment Routing Rules: USING shortest path!"
+		LOG.info("Installing Segment Routing Rules: USING shortest path!")
 	    else:
-		print "[C] Installing Segment Routing Rules: NOT USING shortest path!"
+		LOG.info("Installing Segment Routing Rules: NOT USING shortest path!")
 	    if DEBUG == 1:
 		parameters.print_me()
 
@@ -198,7 +202,7 @@ class SR_controller(app_manager.RyuApp):
 	    actions.append(parser.OFPActionOutput(parameters.out_port))
 	    self._add_flow(datapath,3,match,actions)
 
-	    print "[C] Pushing bridging flows for all other IPV6 packets on OVS: %s" % datapath.address[0]
+	    LOG.info("Pushing bridging flows for all other IPV6 packets on OVS: %s" % datapath.address[0])
 	    match = parser.OFPMatch(in_port=parameters.in_port,eth_type=SR_controller.IPV6_TYPE)
 	    actions = []
 	    actions.append(parser.OFPActionOutput(parameters.out_port))
@@ -218,16 +222,15 @@ class SR_controller(app_manager.RyuApp):
         	self.wsgi = kwargs['wsgi']
 		self.fetch_parameters_from_file()
 		self._construct_segments()
-		if DEBUG == 1:
-			print "Fetched information from file: %s" %self.PARAMETER_FILE
-			print "OVS_IPV6_DST %s" % self.OVS_IPV6_DST
-			print "OVS_SR_MAC %s" % self.OVS_SR_MAC
-			print "OVS_DST_MAC %s" % self.OVS_DST_MAC
-			print "OVS_SEGS %s" % self.OVS_SEGS
-			print "OVS_ADDR %s" % self.OVS_ADDR
-			print "IS_SHORTEST_PATH %s" % self.IS_SHORTEST_PATH
-			print "ALL %s" % self.ALL_PARAMETERS
-		print "[C] Controller started."
+		LOG.debug("Fetched information from file: %s" %self.PARAMETER_FILE)
+		LOG.debug("OVS_IPV6_DST %s" % self.OVS_IPV6_DST)
+		LOG.debug("OVS_SR_MAC %s" % self.OVS_SR_MAC)
+		LOG.debug("OVS_DST_MAC %s" % self.OVS_DST_MAC)
+		LOG.debug("OVS_SEGS %s" % self.OVS_SEGS)
+		LOG.debug("OVS_ADDR %s" % self.OVS_ADDR)
+		LOG.debug("IS_SHORTEST_PATH %s" % self.IS_SHORTEST_PATH)
+		LOG.debug("ALL %s" % self.ALL_PARAMETERS)
+		LOG.info("Controller started!")
 
 	def __del__(self):
 		thread.exit()
@@ -240,18 +243,15 @@ class SR_controller(app_manager.RyuApp):
 		ovs_address = datapath.address[0]
 		parameters = self.get_parameters(ovs_address)
 		self.del_flows(datapath)
-		#self._push_flows_sr_ryu(parser, datapath, parameters)
 		self.dpid_to_datapath[datapath.id] = datapath
-		print self.dpset.get_all()
-		print datapath.id
+		LOG.info("New OVS connected: %d, still waiting for %s OVS to join ..." % (datapath.id, self.NUM_OF_OVS_SWITCHES-1-len(self.dpset.get_all())))
 		if len(self.dpset.get_all()) == self.NUM_OF_OVS_SWITCHES-1:
 			try:
 				SR_rest_api(dpset=self.dpset, wsgi=self.wsgi);
-				print "[C] Rest NB API listener started."
 				SR_flows_mgmt.set_dpid_to_datapath(self.dpid_to_datapath)
-				print "[C] Rest NB API flow manager started."
+				LOG.info("Northbound REST started!")
 			except Exception, e:
-				print "Error when start the NB API: %s" % e
+				LOG.error("Error when start the NB API: %s" % e)
 
 
 

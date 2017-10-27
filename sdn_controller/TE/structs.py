@@ -12,12 +12,13 @@ class V(object):
 	def __init__(self, **kwargs):
 		self.ID = kwargs['ID']
 		self.IntraAdjs = kwargs['IntraAdjs']
+		self.Prefixes = kwargs['Prefixes']
 
 class IntraAdj(object):
 	def __init__(self, **kwargs):
 		self.LSID = kwargs['LSID']
 		self.W = kwargs['W']
-		self.Prefix = kwargs['Prefix']
+		self.Prefixes = kwargs['Prefixes']
 		self.SrcRouterID = kwargs['SrcRouterID']
 		self.DstRouterID = kwargs['DstRouterID']
 		self.DstRouter = kwargs['DstRouter']
@@ -35,8 +36,20 @@ class IntraAdj(object):
 			"\t	Src/Dst Interface IDs:%s, %s\n" 
 			"\t	Src/Dst Interfaces Addresses:%s, %s\n" 
 			"\t	W:%s\n"
-			"\t	Prefix:%s\n" % (self.LSID, self.SrcRouterID, self.DstRouterID, self.DstRouter, self.SrcInterfaceID, self.DstInterfaceID, self.SrcInterfaceAddr, self.DstInterfaceAddr, self.W, self.Prefix) 
+			"\t	Prefixes:%s\n" % (self.LSID, self.SrcRouterID, self.DstRouterID, self.DstRouter, self.SrcInterfaceID, self.DstInterfaceID, self.SrcInterfaceAddr, self.DstInterfaceAddr, self.W, self.Prefixes) 
 		)
+	def str_me(self):
+		return ("LS:\n"
+			"\t	LSID:%s\n" 
+			"\t	SrcRouterID:%s\n" 
+			"\t	DstRouterID:%s\n" 
+			"\t	DstRouter:%s\n "
+			"\t	Src/Dst Interface IDs:%s, %s\n" 
+			"\t	Src/Dst Interfaces Addresses:%s, %s\n" 
+			"\t	W:%s\n"
+			"\t	Prefixes:%s\n" % (self.LSID, self.SrcRouterID, self.DstRouterID, self.DstRouter, self.SrcInterfaceID, self.DstInterfaceID, self.SrcInterfaceAddr, self.DstInterfaceAddr, self.W, self.Prefixes) 
+		)
+
 
 class G(object):
 	def __init__(self, **kwargs):
@@ -44,7 +57,8 @@ class G(object):
 	def getG(self):
 		return self.G
 	def addV(self, V):
-		self.G[V.ID] = V
+		if V:
+			self.G[V.ID] = V
 	def getV(self, ID):
 		return self.G[ID]
 	def delV(self, ID):
@@ -53,4 +67,4 @@ class G(object):
 		for ID in self.G:
 			LOG.info("RouterID:%s\n" % (ID))
 			for adj in self.G[ID].IntraAdjs:
-				LOG.info("\tsrcRtrID:%s,LSID:%s,Prefix:%s,srcIntfID:%s,dstIntfID:%s,dstRtrId:%s\n" % (adj.SrcRouterID, adj.LSID,  adj.Prefix, adj.SrcInterfaceID, adj.DstInterfaceID, adj.DstRouterID))
+				LOG.info("\tsrcRtrID:%s,LSID:%s,Prefixes:%s,srcIntfID:%s,srcIntfAddr:%s,dstIntfID:%s,dstIntfAddr:%s,dstRtrId:%s\n" % (adj.SrcRouterID, adj.LSID,  adj.Prefixes, adj.SrcInterfaceID, adj.SrcInterfaceAddr, adj.DstInterfaceID, adj.DstInterfaceAddr, adj.DstRouterID))
