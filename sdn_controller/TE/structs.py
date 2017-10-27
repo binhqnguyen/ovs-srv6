@@ -27,6 +27,15 @@ class IntraAdj(object):
 		self.DstInterfaceID = kwargs['DstInterfaceID']
 		self.DstInterfaceAddr = kwargs['DstInterfaceAddr']
 
+	def _update(self, src_router_id = None, dst_router_id = None, src_intf_id = None, dst_intf_id = None, src_router_prefixes = None, src_router_lladdr = None):
+	        self.LSID = src_intf_id if src_intf_id else self.LSID
+		self.SrcRouterID = src_router_id if src_router_id else self.SrcRouterId
+		self.DstRouterID = dst_router_id if dst_router_id else self.DstRouterId
+		self.SrcInterfaceID = src_intf_id if src_intf_id else self.SrcInterfaceID
+		self.DstInterfaceID = dst_intf_id if dst_intf_id else self.DstInterfaceID
+		self.Prefixes = src_router_prefixes if src_router_prefixes else self.Prefixes
+		self.SrcInterfaceAddr = src_router_lladdr if src_router_lladdr else self.SrcInterfaceAddr
+
 	def print_me(self):
 		LOG.info("LS:\n"
 			"\t	LSID:%s\n" 
@@ -39,16 +48,15 @@ class IntraAdj(object):
 			"\t	Prefixes:%s\n" % (self.LSID, self.SrcRouterID, self.DstRouterID, self.DstRouter, self.SrcInterfaceID, self.DstInterfaceID, self.SrcInterfaceAddr, self.DstInterfaceAddr, self.W, self.Prefixes) 
 		)
 	def str_me(self):
-		return ("LS:\n"
-			"\t	LSID:%s\n" 
-			"\t	SrcRouterID:%s\n" 
-			"\t	DstRouterID:%s\n" 
-			"\t	DstRouter:%s\n "
-			"\t	Src/Dst Interface IDs:%s, %s\n" 
-			"\t	Src/Dst Interfaces Addresses:%s, %s\n" 
-			"\t	W:%s\n"
+		return "LS:\n"\
+			"\t	LSID:%s\n" \
+			"\t	SrcRouterID:%s\n" \
+			"\t	DstRouterID:%s\n" \
+			"\t	DstRouter:%s\n "\
+			"\t	Src/Dst Interface IDs:%s, %s\n" \
+			"\t	Src/Dst Interfaces Addresses:%s, %s\n" \
+			"\t	W:%s\n"\
 			"\t	Prefixes:%s\n" % (self.LSID, self.SrcRouterID, self.DstRouterID, self.DstRouter, self.SrcInterfaceID, self.DstInterfaceID, self.SrcInterfaceAddr, self.DstInterfaceAddr, self.W, self.Prefixes) 
-		)
 
 
 class G(object):

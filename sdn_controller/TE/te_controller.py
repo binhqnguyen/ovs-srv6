@@ -51,7 +51,7 @@ class Te_controller(ControllerBase):
 		if MSG_TYPES[t] == "LSUPD":
 			v = data['V']['V']
 			lsas = v['LSAS']
-			LOG.debug("Received LSUDP=%s" % v)
+			#LOG.debug("Received LSUDP=%s" % v)
 			for k in lsas:
 				lsa = lsas[k]
 				t = int(lsa['T'])
@@ -137,9 +137,9 @@ class Te_controller(ControllerBase):
 
 		src_router_adj = self._fetch_adj(src_router_id, None, lsid)
 		if src_router_adj:
-			src_router_adj.Prefixes = prefixes
-			src_router_adj.SrcInterfaceAddr = lladdr
-			if 0 != self._update_adj_by_lsid(src_router_id, lsid, src_router_adj):
+			#src_router_adj.Prefixes = prefixes
+			#src_router_adj.SrcInterfaceAddr = lladdr
+			if 0 != self._update_adj(src_router_id, None, src_router_adj, lsid, None, prefixes, lladdr):
 					LOG.warn("Can't update adj (router_id,lsid) = (%s, %s)" % (src_router_id, ls_id))
 
 		else:
@@ -176,16 +176,14 @@ class Te_controller(ControllerBase):
 				dst_router = V(ID=dst_router_id, IntraAdjs = [], Prefixes = [])
 
 			if src_router_adj: #update adj
-				src_router_adj.LSID = lsid
-				if 0 != self._update_adj(src_router_id, dst_router_id, src_router_adj):
+				if 0 != self._update_adj(src_router_id, dst_router_id, src_router_adj, src_intf_id, None):
 					LOG.warn("Can't update adj (%s, %s)" % (src_router_id, dst_router_id))
 			else:	#new adj
 				src_router_adj = IntraAdj(LSID=lsid, W=0, Prefixes=None, SrcRouterID=src_router_id, DstRouterID = dst_router_id, DstRouter=dst_router, SrcInterfaceID=None, SrcInterfaceAddr=None, DstInterfaceID=None, DstInterfaceAddr=None)
 				src_router.IntraAdjs.append(src_router_adj)
 				
 			if dst_router_adj: #update adj
-				dst_router_adj.LSID = lsid
-				if 0 != self._update_adj(dst_router_id, src_router_id, dst_router_adj):
+				if 0 != self._update_adj(dst_router_id, src_router_id, dst_router_adj, None, src_intf_id):
 					LOG.warn("Can't update adj (%s, %s)" % (dst_router_id, src_router_id))
 			
 			else:	#new adj
@@ -219,6 +217,7 @@ class Te_controller(ControllerBase):
 		return None
 
 	def _fetch_adj_by_router_ids(self, src_router_id, dst_router_id):
+		LOG.debug("_fetch_adj_by_router_ids %s, %s" % (src_router_id, dst_router_id))
 		g = Te_controller.graph.getG()
 		if src_router_id not in g:
 			return None
@@ -228,6 +227,7 @@ class Te_controller(ControllerBase):
 		return None
 
 	def _fetch_adj_by_lsid(self, router_id, lsid):
+		LOG.debug("_fetch_adj_by_lsid %s, %s" % (router_id, lsid))
 		g = Te_controller.graph.getG()
 		if router_id not in g:
 			return None
@@ -245,32 +245,47 @@ class Te_controller(ControllerBase):
 		return ret
 
 
-	def _update_adj(self, src_router_id, dst_router_id, new_adj, src_intf_id=None, dst_intf_id=None):
-		LOG.debug("update adj")
-		g = Te_controller.graph.getG()
-		if src_router_id not in g:
-			LOG.warn("Can't find router %s" % src_router_id)
-			return -1
-		for i in range(0, len(g[src_router_id].IntraAdjs)):
-			if dst_router_id == g[src_router_id].IntraAdjs[i].DstRouterID:
-				new_adj.SrcRouterID = src_router_id
-				new_adj.DstRouterID = dst_router_id
-				new_adj.SrcInterfaceID = src_intf_id
-				new_adj.DstInterfaceID = dst_intf_id
-				LOG.debug(new_adj.str_me())
-				g[src_router_id].IntraAdjs[i] = new_adj 
-		return 0
 
-	def _update_adj_by_lsid(self, src_router_id, lsid, new_adj):
+	def _update_adj(self, src_router_id, dst_router_id, new_adj, src_intf_id=None, dst_intf_id=None, src_router_prefixes=None, src_router_lladdr=None):
+		LOG.debug("update adj: src_router_id:%s, dst_router_id:%s, src_intf_id:%s, dst_intf_id:%s, src_router_prefixes:%s, src_router_lladdr:%s" % (src_router_id, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr))
 		g = Te_controller.graph.getG()
+		r1 = 0
+		r2 = 0
+		if src_router_id and dst_router_id:
+			r1 = self._update_adj_by_router_ids(src_router_id, dst_router_id, new_adj, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr, g)
+		if src_router_id and src_intf_id:
+			r2 = self._update_adj_by_lsid(src_router_id, new_adj, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr, g)
+		return max(r1, r2)
+
+	def _update_adj_by_lsid(self, src_router_id, new_adj, dst_router_id = None, src_intf_id = None, dst_intf_id = None, src_router_prefixes = None, src_router_lladdr = None,g = None):
+		if not g:
+			LOG.warn("The topology graph is empty!")
+			return -1
+		lsid = src_intf_id
 		if src_router_id not in g:
 			LOG.warn("Can't find router %s" % src_router_id)
 			return -1
 		for i in range(0, len(g[src_router_id].IntraAdjs)):
 			if lsid == g[src_router_id].IntraAdjs[i].LSID:
+				
+				new_adj._update(src_router_id, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr)
 				g[src_router_id].IntraAdjs[i] = new_adj 
+				LOG.debug("Updated: _update_adj_by_lsid")
 		return 0
 
+	def _update_adj_by_router_ids(self, src_router_id, dst_router_id, new_adj, src_intf_id=None, dst_intf_id=None, src_router_prefixes = None, src_router_lladdr = None, g = None):
+		if not g:
+			LOG.warn("The topology graph is empty!")
+			return -1
+		if src_router_id not in g:
+			LOG.warn("Can't find router %s" % src_router_id)
+			return -1
+		for i in range(0, len(g[src_router_id].IntraAdjs)):
+			if dst_router_id == g[src_router_id].IntraAdjs[i].DstRouterID:
+				new_adj._update(src_router_id, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr)
+				g[src_router_id].IntraAdjs[i] = new_adj 
+				LOG.debug("Updated: _update_adj_by_router_ids")
+		return 0
 
 
 
