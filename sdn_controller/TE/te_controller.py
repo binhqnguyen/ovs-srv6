@@ -69,9 +69,12 @@ class Te_controller(ControllerBase):
 				else:
 					LOG.warn("Received Unknown LSA, type:%s, lsid:%s, advrtr:%s" % (t, lsid, advrtr))
 		return Response(status=500)
-
+	
+	#Logic:
+	#	- If router does not exist, create a new one.
+	#	- If router existed, delete all existing adjs that aren't specified in the LSA.
+	#	- Create adjs that don't exist and are specified in the LSA.
 	def _process_rtr_lsa(self, lsa, lsid, advrtr):
-		#TODO: delete a router if offline
 		LOG.info("Router LSA: lsid:%s, advrtr:%s" % (lsid, advrtr))
 		LOG.info("Router LSA: %s\n\n" % lsa)
 		src_router_adjs = []
@@ -197,8 +200,29 @@ class Te_controller(ControllerBase):
 
 
 	def _process_intraareaprefix_lsa(self, lsa, lsid, advrtr):
-		LOG.info("Intra Area Prefix LSA: lsid:%s, advrtr:%s" % (lsid, advrtr))
+		reflsid = lsa['reflsid']
+		src_router_id = lsa['refadvrouter']
+		prefixes = lsa['prefixes']
+		LOG.info("Intra Area Prefix LSA: lsid:%s, advrtr:%s, reflsid:%s, refadvrouterid:%s" % (lsid, advrtr, reflsid, src_router_id))
 		LOG.info("Intra Area Prefix LSA: %s\n\n" % lsa)
+		src_router = self._fetch_router(src_router_id)
+		if src_router:
+			src_router.Prefixes = prefixes
+		else:
+			src_router = V(ID=src_router_id, IntraAdjs = [], Prefixes = prefixes)
+
+		src_router_adj = self._fetch_adj(src_router_id, None, reflsid)
+		if src_router_adj:
+			if 0 != self._update_adj(src_router_id, None, src_router_adj, reflsid, None, prefixes, None):
+					LOG.warn("Can't update adj (router_id,lsid) = (%s, %s)" % (src_router_id, reflsid))
+
+		else:
+			src_router_adj = IntraAdj(LSID=reflsid, W=0, Prefixes=prefixes, SrcRouterID=src_router_id, DstRouterID = None, DstRouter=None, SrcInterfaceID=reflsid, SrcInterfaceAddr=None, DstInterfaceID=None, DstInterfaceAddr=None)
+			src_router.IntraAdjs.append(src_router_adj)
+
+		Te_controller.graph.addV(src_router)
+		Te_controller.graph.print_me()
+
 
 	def _is_adj_exist(self, src_router_id, dst_router_id):
 		g = Te_controller.graph.getG()
@@ -216,9 +240,8 @@ class Te_controller(ControllerBase):
 			return g[router_id]
 		return None
 
-	def _fetch_adj_by_router_ids(self, src_router_id, dst_router_id):
+	def _fetch_adj_by_router_ids(self, src_router_id, dst_router_id, g):
 		LOG.debug("_fetch_adj_by_router_ids %s, %s" % (src_router_id, dst_router_id))
-		g = Te_controller.graph.getG()
 		if src_router_id not in g:
 			return None
 		for adj in g[src_router_id].IntraAdjs:
@@ -226,9 +249,8 @@ class Te_controller(ControllerBase):
 				return adj
 		return None
 
-	def _fetch_adj_by_lsid(self, router_id, lsid):
+	def _fetch_adj_by_lsid(self, router_id, lsid, g):
 		LOG.debug("_fetch_adj_by_lsid %s, %s" % (router_id, lsid))
-		g = Te_controller.graph.getG()
 		if router_id not in g:
 			return None
 		for adj in g[router_id].IntraAdjs:
@@ -238,10 +260,11 @@ class Te_controller(ControllerBase):
 
 	def _fetch_adj(self, src_router_id = None, dst_router_id = None, lsid = None):
 		ret = None
-		if src_router_id and dst_router_id:
-			 ret = self._fetch_adj_by_router_ids(src_router_id, dst_router_id)
-		if not ret and src_router_id and lsid:
-			 ret = self._fetch_adj_by_lsid(src_router_id, lsid)
+		g = Te_controller.graph.getG()
+		if src_router_id != None and dst_router_id != None:
+			 ret = self._fetch_adj_by_router_ids(src_router_id, dst_router_id, g)
+		if ret == None and src_router_id != None and lsid != None:
+			 ret = self._fetch_adj_by_lsid(src_router_id, lsid, g)
 		return ret
 
 
