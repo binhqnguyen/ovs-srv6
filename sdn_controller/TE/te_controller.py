@@ -34,7 +34,7 @@ from structs import *
 from ospfv3 import *
 
 LOG = logging.getLogger('ryu.app.Te_controller')
-LOG.setLevel(logging.INFO)
+LOG.setLevel(logging.DEBUG)
 
 class Te_controller(ControllerBase):
 
@@ -77,7 +77,7 @@ class Te_controller(ControllerBase):
 	def _process_rtr_lsa(self, lsa, lsid, advrtr):
 		LOG.info("Router LSA: lsid:%s, advrtr:%s" % (lsid, advrtr))
 		LOG.info("Router LSA: %s\n\n" % lsa)
-		src_router_adjs = []
+		src_router_adjs = defaultdict(list)
 		src_router_id = advrtr
 		src_router = self._fetch_router(src_router_id)
 		if src_router:
@@ -97,6 +97,8 @@ class Te_controller(ControllerBase):
 			dst_router = self._fetch_router(dst_router_id)
 			src_intf_id = intf['INTERFACEID']
 			dst_intf_id = intf['NBINTERFACEID']
+			#self._remember_adjs(src_router_adjs, src_router_id, dst_router_id)
+			src_router_adjs[src_router_id].append(dst_router_id)
 			src_router_adj = self._fetch_adj(src_router_id, dst_router_id, src_intf_id)
 			dst_router_adj = self._fetch_adj(dst_router_id, src_router_id, dst_intf_id)
 			if dst_router: #update
@@ -104,7 +106,7 @@ class Te_controller(ControllerBase):
 			else:	#new
 				dst_router = V(ID=dst_router_id, IntraAdjs = [], Prefixes = [])
 			if src_router_adj: #update
-				if 0 != self._update_adj(src_router_id, dst_router_id, src_router_adj, src_intf_id, dst_intf_id):
+				if 0 != self._update_adj(src_router_id, dst_router_id, src_intf_id, dst_intf_id):
 					LOG.warn("Can't update adj (%s, %s)" % (src_router_id, dst_router_id))
 
 			else:	#new
@@ -112,7 +114,7 @@ class Te_controller(ControllerBase):
 				src_router.IntraAdjs.append(src_router_adj)
 			
 			if dst_router_adj: #update
-				if 0 != self._update_adj(dst_router_id, src_router_id, dst_router_adj, dst_intf_id, src_intf_id):
+				if 0 != self._update_adj(dst_router_id, src_router_id, dst_intf_id, src_intf_id):
 					LOG.warn("Can't update adj (%s, %s)" % (dst_router_id, src_router_id))
 			else:	#new
 				dst_router_adj = IntraAdj(LSID=dst_intf_id, W=0, Prefixes=None, SrcRouterID=dst_router_id, DstRouterID = advrtr, DstRouter=src_router, SrcInterfaceID=dst_intf_id, SrcInterfaceAddr=None, DstInterfaceID=src_intf_id, DstInterfaceAddr=None)
@@ -121,6 +123,10 @@ class Te_controller(ControllerBase):
 			#update the router in graph
 			Te_controller.graph.addV(dst_router)
 	
+		#Delete adjs that are not specified in the LSA
+		#if 0 != self._remove_adjs(src_router_id, src_router_adjs):
+		#	LOG.warn("Can't remove adjacencies in router %s" % src_router_id)
+
 		#update the router in graph
 		Te_controller.graph.addV(src_router)
 		Te_controller.graph.print_me()
@@ -142,7 +148,7 @@ class Te_controller(ControllerBase):
 		if src_router_adj:
 			#src_router_adj.Prefixes = prefixes
 			#src_router_adj.SrcInterfaceAddr = lladdr
-			if 0 != self._update_adj(src_router_id, None, src_router_adj, lsid, None, prefixes, lladdr):
+			if 0 != self._update_adj(src_router_id, None,  lsid, None, prefixes, lladdr):
 					LOG.warn("Can't update adj (router_id,lsid) = (%s, %s)" % (src_router_id, ls_id))
 
 		else:
@@ -179,14 +185,14 @@ class Te_controller(ControllerBase):
 				dst_router = V(ID=dst_router_id, IntraAdjs = [], Prefixes = [])
 
 			if src_router_adj: #update adj
-				if 0 != self._update_adj(src_router_id, dst_router_id, src_router_adj, src_intf_id, None):
+				if 0 != self._update_adj(src_router_id, dst_router_id, src_intf_id, None):
 					LOG.warn("Can't update adj (%s, %s)" % (src_router_id, dst_router_id))
 			else:	#new adj
 				src_router_adj = IntraAdj(LSID=lsid, W=0, Prefixes=None, SrcRouterID=src_router_id, DstRouterID = dst_router_id, DstRouter=dst_router, SrcInterfaceID=None, SrcInterfaceAddr=None, DstInterfaceID=None, DstInterfaceAddr=None)
 				src_router.IntraAdjs.append(src_router_adj)
 				
 			if dst_router_adj: #update adj
-				if 0 != self._update_adj(dst_router_id, src_router_id, dst_router_adj, None, src_intf_id):
+				if 0 != self._update_adj(dst_router_id, src_router_id, None, src_intf_id):
 					LOG.warn("Can't update adj (%s, %s)" % (dst_router_id, src_router_id))
 			
 			else:	#new adj
@@ -213,7 +219,7 @@ class Te_controller(ControllerBase):
 
 		src_router_adj = self._fetch_adj(src_router_id, None, reflsid)
 		if src_router_adj:
-			if 0 != self._update_adj(src_router_id, None, src_router_adj, reflsid, None, prefixes, None):
+			if 0 != self._update_adj(src_router_id, None,  reflsid, None, prefixes, None):
 					LOG.warn("Can't update adj (router_id,lsid) = (%s, %s)" % (src_router_id, reflsid))
 
 		else:
@@ -224,6 +230,28 @@ class Te_controller(ControllerBase):
 		Te_controller.graph.print_me()
 
 
+	def _remember_adjs(self, router_adjs, src_router_id, dst_router_id):
+		if src_router_id in router_adjs:
+			router_adjs[src_router_id].append(dst_router_id)
+		else:
+			router_adjs[src_router_id] = [dst_router_id]
+		return 0
+
+	def _remove_adjs(self, router_id, router_adjs):
+		if router_id not in router_adjs:
+			return 0
+		g = Te_controller.graph.getG()	
+		if router_id not in g:
+			return -1
+		for adj in g[router_id].IntraAdjs:
+			if not adj.DstRouterID in router_adjs[router_id]:
+				LOG.debug("Removing adj: router:%s, dst_router:%s, router_adjs:%s" % (router_id, adj.DstRouterID, router_adjs))
+				Te_controller.graph.deleteAdj(router_id, adj.DstRouterID)
+				if adj.DstRouterID != None:
+					Te_controller.graph.deleteAdj(adj.DstRouterID, router_id) #also delete the oposite adj
+		return 0
+
+	
 	def _is_adj_exist(self, src_router_id, dst_router_id):
 		g = Te_controller.graph.getG()
 		if src_router_id not in g:
@@ -269,14 +297,16 @@ class Te_controller(ControllerBase):
 
 
 
-	def _update_adj(self, src_router_id, dst_router_id, new_adj, src_intf_id=None, dst_intf_id=None, src_router_prefixes=None, src_router_lladdr=None):
+	def _update_adj(self, src_router_id, dst_router_id, src_intf_id=None, dst_intf_id=None, src_router_prefixes=None, src_router_lladdr=None):
 		LOG.debug("update adj: src_router_id:%s, dst_router_id:%s, src_intf_id:%s, dst_intf_id:%s, src_router_prefixes:%s, src_router_lladdr:%s" % (src_router_id, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr))
 		g = Te_controller.graph.getG()
 		r1 = 0
 		r2 = 0
 		if src_router_id and dst_router_id:
+			new_adj = self._fetch_adj_by_router_ids(src_router_id, dst_router_id, g)
 			r1 = self._update_adj_by_router_ids(src_router_id, dst_router_id, new_adj, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr, g)
 		if src_router_id and src_intf_id:
+			new_adj = self._fetch_adj_by_lsid(src_router_id, src_intf_id, g)
 			r2 = self._update_adj_by_lsid(src_router_id, new_adj, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr, g)
 		return max(r1, r2)
 

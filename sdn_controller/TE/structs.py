@@ -28,13 +28,19 @@ class IntraAdj(object):
 		self.DstInterfaceAddr = kwargs['DstInterfaceAddr']
 
 	def _update(self, src_router_id = None, dst_router_id = None, src_intf_id = None, dst_intf_id = None, src_router_prefixes = None, src_router_lladdr = None):
-	        self.LSID = src_intf_id if src_intf_id != None else self.LSID
-		self.SrcRouterID = src_router_id if src_router_id != None else self.SrcRouterID
-		self.DstRouterID = dst_router_id if dst_router_id != None else self.DstRouterID
-		self.SrcInterfaceID = src_intf_id if src_intf_id != None else self.SrcInterfaceID
-		self.DstInterfaceID = dst_intf_id if dst_intf_id != None else self.DstInterfaceID
+		if src_intf_id != None:
+	        	self.LSID = src_intf_id
+		if src_router_id != None:
+			self.SrcRouterID = src_router_id 
+		if dst_router_id != None:
+			self.DstRouterID = dst_router_id
+		if src_intf_id != None:
+			self.SrcInterfaceID = src_intf_id
+		if dst_intf_id != None:
+			self.DstInterfaceID = dst_intf_id
 		self._update_prefixes(src_router_prefixes)
-		self.SrcInterfaceAddr = src_router_lladdr if src_router_lladdr != None else self.SrcInterfaceAddr
+		if src_router_lladdr != None:
+			self.SrcInterfaceAddr = src_router_lladdr
 
 	def _update_prefixes(self, new_prefixes):
 		if new_prefixes:
@@ -80,6 +86,16 @@ class G(object):
 		return self.G[ID]
 	def delV(self, ID):
 		del self.G[ID]
+	def deleteAdj(self, src_router_id, dst_router_id):
+		index = 0
+		for adj in self.G[src_router_id].IntraAdjs:
+			if adj.LSID != None and adj.LSID != 0 and adj.DstRouterID == dst_router_id:	#a bit conservative here.
+				del self.G[src_router_id].IntraAdjs[index]
+			index += 1
+		if self.G[src_router_id].IntraAdjs == None:
+			self.G[src_router_id].IntraAdjs = []
+
+
 	def print_me(self):
 		for ID in self.G:
 			LOG.info("RouterID:%s\n" % (ID))
