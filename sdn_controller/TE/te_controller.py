@@ -89,6 +89,7 @@ class Te_controller(ControllerBase):
 		#Note: if there is an ADJ from router 1 -> router 2, then there is automatically another ADJ from router 2 -> router 1.
 		for intf in lsa['INTERFACES']:
 			dst_router_id = intf['NBROUTERID']
+			w = intf['METRIC']
 			#adv router and neighbor router are the same, skip this LSA
 			if src_router_id == dst_router_id:
 				src_router = None
@@ -106,18 +107,18 @@ class Te_controller(ControllerBase):
 			else:	#new
 				dst_router = V(ID=dst_router_id, IntraAdjs = [], Prefixes = [])
 			if src_router_adj: #update
-				if 0 != self._update_adj(src_router_id, dst_router_id, src_intf_id, dst_intf_id):
+				if 0 != self._update_adj(src_router_id, dst_router_id, src_intf_id, dst_intf_id, None, None, w):
 					LOG.warn("Can't update adj (%s, %s)" % (src_router_id, dst_router_id))
 
 			else:	#new
-				src_router_adj = IntraAdj(LSID=src_intf_id, W=0, Prefixes=None, SrcRouterID=src_router_id, DstRouterID = dst_router_id, DstRouter=dst_router, SrcInterfaceID=src_intf_id, SrcInterfaceAddr=None, DstInterfaceID=dst_intf_id, DstInterfaceAddr=None)
+				src_router_adj = IntraAdj(LSID=src_intf_id, W=w, Prefixes=None, SrcRouterID=src_router_id, DstRouterID = dst_router_id, DstRouter=dst_router, SrcInterfaceID=src_intf_id, SrcInterfaceAddr=None, DstInterfaceID=dst_intf_id)
 				src_router.IntraAdjs.append(src_router_adj)
 			
 			if dst_router_adj: #update
-				if 0 != self._update_adj(dst_router_id, src_router_id, dst_intf_id, src_intf_id):
+				if 0 != self._update_adj(dst_router_id, src_router_id, dst_intf_id, src_intf_id, None, None, w):
 					LOG.warn("Can't update adj (%s, %s)" % (dst_router_id, src_router_id))
 			else:	#new
-				dst_router_adj = IntraAdj(LSID=dst_intf_id, W=0, Prefixes=None, SrcRouterID=dst_router_id, DstRouterID = advrtr, DstRouter=src_router, SrcInterfaceID=dst_intf_id, SrcInterfaceAddr=None, DstInterfaceID=src_intf_id, DstInterfaceAddr=None)
+				dst_router_adj = IntraAdj(LSID=dst_intf_id, W=w, Prefixes=None, SrcRouterID=dst_router_id, DstRouterID = advrtr, DstRouter=src_router, SrcInterfaceID=dst_intf_id, SrcInterfaceAddr=None, DstInterfaceID=src_intf_id)
 				dst_router.IntraAdjs.append(dst_router_adj)
 
 			#update the router in graph
@@ -152,7 +153,7 @@ class Te_controller(ControllerBase):
 					LOG.warn("Can't update adj (router_id,lsid) = (%s, %s)" % (src_router_id, ls_id))
 
 		else:
-			src_router_adj = IntraAdj(LSID=lsid, W=0, Prefixes=prefixes, SrcRouterID=src_router_id, DstRouterID = None, DstRouter=None, SrcInterfaceID=lsid, SrcInterfaceAddr=lladdr, DstInterfaceID=None, DstInterfaceAddr=None)
+			src_router_adj = IntraAdj(LSID=lsid, W=0, Prefixes=prefixes, SrcRouterID=src_router_id, DstRouterID = None, DstRouter=None, SrcInterfaceID=lsid, SrcInterfaceAddr=lladdr, DstInterfaceID=None)
 			src_router.IntraAdjs.append(src_router_adj)
 
 		Te_controller.graph.addV(src_router)
@@ -188,15 +189,15 @@ class Te_controller(ControllerBase):
 				if 0 != self._update_adj(src_router_id, dst_router_id, src_intf_id, None):
 					LOG.warn("Can't update adj (%s, %s)" % (src_router_id, dst_router_id))
 			else:	#new adj
-				src_router_adj = IntraAdj(LSID=lsid, W=0, Prefixes=None, SrcRouterID=src_router_id, DstRouterID = dst_router_id, DstRouter=dst_router, SrcInterfaceID=None, SrcInterfaceAddr=None, DstInterfaceID=None, DstInterfaceAddr=None)
+				src_router_adj = IntraAdj(LSID=lsid, W=0, Prefixes=None, SrcRouterID=src_router_id, DstRouterID = dst_router_id, DstRouter=dst_router, SrcInterfaceID=None, SrcInterfaceAddr=None, DstInterfaceID=None)
 				src_router.IntraAdjs.append(src_router_adj)
 				
 			if dst_router_adj: #update adj
-				if 0 != self._update_adj(dst_router_id, src_router_id, None, src_intf_id):
+				if 0 != self._update_adj(dst_router_id, src_router_id, None, src_intf_id, None):
 					LOG.warn("Can't update adj (%s, %s)" % (dst_router_id, src_router_id))
 			
 			else:	#new adj
-				dst_router_adj = IntraAdj(LSID=None, W=0, Prefixes=None, SrcRouterID=dst_router_id, DstRouterID=src_router_id, DstRouter=src_router, SrcInterfaceID=None, SrcInterfaceAddr=None, DstInterfaceID=None, DstInterfaceAddr=None)
+				dst_router_adj = IntraAdj(LSID=None, W=0, Prefixes=None, SrcRouterID=dst_router_id, DstRouterID=src_router_id, DstRouter=src_router, SrcInterfaceID=None, SrcInterfaceAddr=None, DstInterfaceID=None)
 				dst_router.IntraAdjs.append(dst_router_adj)
 		#update the nodes in graph
 		Te_controller.graph.addV(dst_router)
@@ -219,11 +220,11 @@ class Te_controller(ControllerBase):
 
 		src_router_adj = self._fetch_adj(src_router_id, None, reflsid)
 		if src_router_adj:
-			if 0 != self._update_adj(src_router_id, None,  reflsid, None, prefixes, None):
+			if 0 != self._update_adj(src_router_id, None,  reflsid, None, prefixes, None, None):
 					LOG.warn("Can't update adj (router_id,lsid) = (%s, %s)" % (src_router_id, reflsid))
 
 		else:
-			src_router_adj = IntraAdj(LSID=reflsid, W=0, Prefixes=prefixes, SrcRouterID=src_router_id, DstRouterID = None, DstRouter=None, SrcInterfaceID=reflsid, SrcInterfaceAddr=None, DstInterfaceID=None, DstInterfaceAddr=None)
+			src_router_adj = IntraAdj(LSID=reflsid, W=0, Prefixes=prefixes, SrcRouterID=src_router_id, DstRouterID = None, DstRouter=None, SrcInterfaceID=reflsid, SrcInterfaceAddr=None, DstInterfaceID=None)
 			src_router.IntraAdjs.append(src_router_adj)
 
 		Te_controller.graph.addV(src_router)
@@ -297,20 +298,20 @@ class Te_controller(ControllerBase):
 
 
 
-	def _update_adj(self, src_router_id, dst_router_id, src_intf_id=None, dst_intf_id=None, src_router_prefixes=None, src_router_lladdr=None):
-		LOG.debug("update adj: src_router_id:%s, dst_router_id:%s, src_intf_id:%s, dst_intf_id:%s, src_router_prefixes:%s, src_router_lladdr:%s" % (src_router_id, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr))
+	def _update_adj(self, src_router_id, dst_router_id, src_intf_id=None, dst_intf_id=None, src_router_prefixes=None, src_router_lladdr=None, W=None):
+		LOG.debug("update adj: src_router_id:%s, dst_router_id:%s, src_intf_id:%s, dst_intf_id:%s, src_router_prefixes:%s, src_router_lladdr:%s, w:%s" % (src_router_id, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr, W))
 		g = Te_controller.graph.getG()
 		r1 = 0
 		r2 = 0
-		if src_router_id and dst_router_id:
+		if src_router_id != None and dst_router_id != None:
 			new_adj = self._fetch_adj_by_router_ids(src_router_id, dst_router_id, g)
-			r1 = self._update_adj_by_router_ids(src_router_id, dst_router_id, new_adj, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr, g)
-		if src_router_id and src_intf_id:
+			r1 = self._update_adj_by_router_ids(src_router_id, dst_router_id, new_adj, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr, W, g)
+		if src_router_id != None and src_intf_id != None:
 			new_adj = self._fetch_adj_by_lsid(src_router_id, src_intf_id, g)
-			r2 = self._update_adj_by_lsid(src_router_id, new_adj, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr, g)
+			r2 = self._update_adj_by_lsid(src_router_id, new_adj, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr, W, g)
 		return max(r1, r2)
 
-	def _update_adj_by_lsid(self, src_router_id, new_adj, dst_router_id = None, src_intf_id = None, dst_intf_id = None, src_router_prefixes = None, src_router_lladdr = None,g = None):
+	def _update_adj_by_lsid(self, src_router_id, new_adj, dst_router_id = None, src_intf_id = None, dst_intf_id = None, src_router_prefixes = None, src_router_lladdr = None, W=None, g = None):
 		if not g:
 			LOG.warn("The topology graph is empty!")
 			return -1
@@ -321,12 +322,12 @@ class Te_controller(ControllerBase):
 		for i in range(0, len(g[src_router_id].IntraAdjs)):
 			if lsid == g[src_router_id].IntraAdjs[i].LSID:
 				
-				new_adj._update(src_router_id, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr)
+				new_adj._update(src_router_id, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr, W)
 				g[src_router_id].IntraAdjs[i] = new_adj 
 				LOG.debug("Updated: _update_adj_by_lsid")
 		return 0
 
-	def _update_adj_by_router_ids(self, src_router_id, dst_router_id, new_adj, src_intf_id=None, dst_intf_id=None, src_router_prefixes = None, src_router_lladdr = None, g = None):
+	def _update_adj_by_router_ids(self, src_router_id, dst_router_id, new_adj, src_intf_id=None, dst_intf_id=None, src_router_prefixes = None, src_router_lladdr = None, W=None, g = None):
 		if not g:
 			LOG.warn("The topology graph is empty!")
 			return -1
@@ -335,7 +336,7 @@ class Te_controller(ControllerBase):
 			return -1
 		for i in range(0, len(g[src_router_id].IntraAdjs)):
 			if dst_router_id == g[src_router_id].IntraAdjs[i].DstRouterID:
-				new_adj._update(src_router_id, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr)
+				new_adj._update(src_router_id, dst_router_id, src_intf_id, dst_intf_id, src_router_prefixes, src_router_lladdr, W)
 				g[src_router_id].IntraAdjs[i] = new_adj 
 				LOG.debug("Updated: _update_adj_by_router_ids")
 		return 0

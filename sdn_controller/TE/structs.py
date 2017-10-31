@@ -25,13 +25,15 @@ class IntraAdj(object):
 		self.SrcInterfaceID = kwargs['SrcInterfaceID']
 		self.SrcInterfaceAddr = kwargs['SrcInterfaceAddr']
 		self.DstInterfaceID = kwargs['DstInterfaceID']
-		self.DstInterfaceAddr = kwargs['DstInterfaceAddr']
+		#self.DstInterfaceAddr = kwargs['DstInterfaceAddr']
 
-	def _update(self, src_router_id = None, dst_router_id = None, src_intf_id = None, dst_intf_id = None, src_router_prefixes = None, src_router_lladdr = None):
+	def _update(self, src_router_id = None, dst_router_id = None, src_intf_id = None, dst_intf_id = None, src_router_prefixes = None, src_router_lladdr = None, W = None):
 		if src_intf_id != None:
 	        	self.LSID = src_intf_id
 		if src_router_id != None:
 			self.SrcRouterID = src_router_id 
+		if W != None:
+			self.W = W 
 		if dst_router_id != None:
 			self.DstRouterID = dst_router_id
 		if src_intf_id != None:
@@ -58,9 +60,9 @@ class IntraAdj(object):
 			"\t	DstRouterID:%s\n" 
 			"\t	DstRouter:%s\n "
 			"\t	Src/Dst Interface IDs:%s, %s\n" 
-			"\t	Src/Dst Interfaces Addresses:%s, %s\n" 
+			"\t	Src Interface Address:%s\n" 
 			"\t	W:%s\n"
-			"\t	Prefixes:%s\n" % (self.LSID, self.SrcRouterID, self.DstRouterID, self.DstRouter, self.SrcInterfaceID, self.DstInterfaceID, self.SrcInterfaceAddr, self.DstInterfaceAddr, self.W, self.Prefixes) 
+			"\t	Prefixes:%s\n" % (self.LSID, self.SrcRouterID, self.DstRouterID, self.DstRouter, self.SrcInterfaceID, self.DstInterfaceID, self.SrcInterfaceAddr, self.W, self.Prefixes) 
 		)
 	def str_me(self):
 		return "LS:\n"\
@@ -69,9 +71,9 @@ class IntraAdj(object):
 			"\t	DstRouterID:%s\n" \
 			"\t	DstRouter:%s\n "\
 			"\t	Src/Dst Interface IDs:%s, %s\n" \
-			"\t	Src/Dst Interfaces Addresses:%s, %s\n" \
+			"\t	Src Interface Address:%s\n" \
 			"\t	W:%s\n"\
-			"\t	Prefixes:%s\n" % (self.LSID, self.SrcRouterID, self.DstRouterID, self.DstRouter, self.SrcInterfaceID, self.DstInterfaceID, self.SrcInterfaceAddr, self.DstInterfaceAddr, self.W, self.Prefixes) 
+			"\t	Prefixes:%s\n" % (self.LSID, self.SrcRouterID, self.DstRouterID, self.DstRouter, self.SrcInterfaceID, self.DstInterfaceID, self.SrcInterfaceAddr, self.W, self.Prefixes) 
 
 
 class G(object):
@@ -100,4 +102,4 @@ class G(object):
 		for ID in self.G:
 			LOG.info("RouterID:%s\n" % (ID))
 			for adj in self.G[ID].IntraAdjs:
-				LOG.info("\tsrcRtrID:%s,LSID:%s,Prefixes:%s,srcIntfID:%s,srcIntfAddr:%s,dstIntfID:%s,dstIntfAddr:%s,dstRtrId:%s\n" % (adj.SrcRouterID, adj.LSID,  adj.Prefixes, adj.SrcInterfaceID, adj.SrcInterfaceAddr, adj.DstInterfaceID, adj.DstInterfaceAddr, adj.DstRouterID))
+				LOG.info("\tsrcRtrID:%s,LSID:%s,W:%s,Prefixes:%s,srcIntfID:%s,srcIntfAddr:%s,dstIntfID:%s,dstRtrId:%s\n" % (adj.SrcRouterID, adj.LSID, adj.W, adj.Prefixes, adj.SrcInterfaceID, adj.SrcInterfaceAddr, adj.DstInterfaceID, adj.DstRouterID))
