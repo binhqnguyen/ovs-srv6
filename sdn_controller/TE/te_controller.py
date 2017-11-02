@@ -55,6 +55,7 @@ class Te_controller(ControllerBase):
 			graph = Te_controller.graph
 			graph.clear_active_nbs()	#clear active neighbors to get new active neighbors
 			graph.neighbor_last_refresh = time.time() #Start the refresh timer after receiving a LSUPD (likely link change detected)
+	                #LOG.debug(graph.printNB())
 			#LOG.debug("Received LSUDP=%s" % v)
 			for k in lsas:
 				lsa = lsas[k]
@@ -98,6 +99,7 @@ class Te_controller(ControllerBase):
 		if refresh_timer > graph.NB_REFRESH_INTERVAL: #refresh the active neighbors graph periodically
 			self._update_active_nbs_graph(g)
 			graph.neighbor_last_refresh = time.time()
+	                graph.print_me()
 		
 	#not used
 	def _is_active_nbs_changed(self, router_id, new_nbs):
@@ -127,10 +129,11 @@ class Te_controller(ControllerBase):
 			for adj in g[router_id].IntraAdjs:
 				router_nbs[adj.DstRouterID] = 1
 				if adj.DstRouterID not in active_nbs: #delete the neighbor that is no longer active
-					Te_controller.graph.deleteAdj(router_id, adj.DstRouterID)
+					#Te_controller.graph.deleteAdj(router_id, adj.DstRouterID)
+					Te_controller.graph.markDeletedAdj(router_id, adj.DstRouterID)
 			for active_nb in active_nbs:
 				if active_nb not in router_nbs: #add the active neighbor that is now active
-					Te_controller.graph.addAdj(router_id, nb)
+					Te_controller.graph.addAdj(router_id, active_nb)
 		return 0
 
 	#Logic:
@@ -143,7 +146,7 @@ class Te_controller(ControllerBase):
 		src_router_adjs = defaultdict(list)
 		src_router_id = advrtr
 		src_router = self._fetch_router(src_router_id)
-		if src_router:
+		if src_router != None:
 			pass
 		else:
 			src_router = V(ID=src_router_id, IntraAdjs = [], Prefixes = [], ActiveNbs = {})
@@ -155,17 +158,16 @@ class Te_controller(ControllerBase):
 			w = intf['METRIC']
 			#adv router and neighbor router are the same, skip this LSA
 			if src_router_id == dst_router_id:
-				src_router = None
+				#src_router = None
 				continue
 
 			dst_router = self._fetch_router(dst_router_id)
 			src_intf_id = intf['INTERFACEID']
 			dst_intf_id = intf['NBINTERFACEID']
-			#self._remember_adjs(src_router_adjs, src_router_id, dst_router_id)
 			#src_router_adjs[src_router_id].append(dst_router_id)
 			src_router_adj = self._fetch_adj(src_router_id, dst_router_id, src_intf_id)
 			dst_router_adj = self._fetch_adj(dst_router_id, src_router_id, dst_intf_id)
-			if dst_router: #update
+			if dst_router != None: #update
 				pass 
 			else:	#new
 				dst_router = V(ID=dst_router_id, IntraAdjs = [], Prefixes = [], ActiveNbs = {})
@@ -193,6 +195,7 @@ class Te_controller(ControllerBase):
 
 		#update the router in graph
 		Te_controller.graph.addV(src_router)
+		Te_controller.graph.remove_duplicated_adjs(src_router_id)
 		Te_controller.graph.print_me()
 		
 
@@ -210,8 +213,6 @@ class Te_controller(ControllerBase):
 
 		src_router_adj = self._fetch_adj(src_router_id, None, lsid)
 		if src_router_adj:
-			#src_router_adj.Prefixes = prefixes
-			#src_router_adj.SrcInterfaceAddr = lladdr
 			if 0 != self._update_adj(src_router_id, None,  lsid, None, prefixes, lladdr):
 					LOG.warn("Can't update adj (router_id,lsid) = (%s, %s)" % (src_router_id, ls_id))
 
@@ -226,7 +227,6 @@ class Te_controller(ControllerBase):
 		
 
 	def _process_network_lsa(self, lsa, lsid, advrtr):
-		#TODO: delete a router if offline
 		LOG.info("**Network LSA**: lsid:%s, advrtr:%s" % (lsid, advrtr))
 		LOG.info("**Network LSA**: %s\n\n"% lsa)
 		src_router_id = advrtr
@@ -265,6 +265,7 @@ class Te_controller(ControllerBase):
 		#update the nodes in graph
 		Te_controller.graph.addV(dst_router)
 		Te_controller.graph.addV(src_router)
+		Te_controller.graph.remove_duplicated_adjs(src_router_id)
 		Te_controller.graph.print_me()
 	
 

@@ -82,7 +82,7 @@ class IntraAdj(object):
 
 
 class G(object):
-	NB_REFRESH_INTERVAL = 60 #in seconds 
+	NB_REFRESH_INTERVAL = 10 #in seconds 
 	def __init__(self, **kwargs):
 		self.G = {}
 		self.neighbor_last_refresh = sys.maxint
@@ -97,11 +97,10 @@ class G(object):
 		return None
 	def delV(self, ID):
 		del self.G[ID]
-	def markDeleteAdj(self, src_router_id, dst_router_id):
+	def markDeletedAdj(self, src_router_id, dst_router_id):
 		index = 0
 		for adj in self.G[src_router_id].IntraAdjs:
-			if adj.LSID != None and adj.LSID != 0 and adj.DstRouterID == dst_router_id:	#a bit conservative here.
-				#del self.G[src_router_id].IntraAdjs[index]
+			if adj.LSID != 0 and adj.DstRouterID == dst_router_id:	#a bit conservative here.
 				self.G[src_router_id].IntraAdjs[index].D = 1
 			index += 1
 		if self.G[src_router_id].IntraAdjs == None:
@@ -110,7 +109,7 @@ class G(object):
 	def deleteAdj(self, src_router_id, dst_router_id):
 		index = 0
 		for adj in self.G[src_router_id].IntraAdjs:
-			if adj.LSID != None and adj.LSID != 0 and adj.DstRouterID == dst_router_id:	#a bit conservative here.
+			if adj.LSID != 0 and adj.DstRouterID == dst_router_id:
 				del self.G[src_router_id].IntraAdjs[index]
 			index += 1
 		if self.G[src_router_id].IntraAdjs == None:
@@ -129,6 +128,19 @@ class G(object):
 		dst_router.IntraAdjs.append(dst_router_adj)
 		return 0
 
+	def remove_duplicated_adjs(self, router_id):
+		LOG.debug("remove_duplicated_adjs, router_id:%s" % router_id)
+		adjs = {}
+		index = 0
+		for adj in self.G[router_id].IntraAdjs:
+			lsid = adj.LSID
+			dst_router_id = adj.DstRouterID
+			if dst_router_id in adjs and lsid == adjs[dst_router_id]:
+				del self.G[router_id].IntraAdjs[index]
+			else:
+				adjs[dst_router_id] = lsid
+			index += 1
+		self.print_me()
 
 	def print_me(self):
 		for ID in self.G:
@@ -145,5 +157,5 @@ class G(object):
 
 	def clear_active_nbs(self):
 		for ID in self.G:
-			self.G[ID].ActiveNBs = {}
+			self.G[ID].ActiveNbs = {}
 
