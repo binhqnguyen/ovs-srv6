@@ -32,6 +32,7 @@ from northbound_actions import Actions as Actions
 from sr_flows_mgmt import SR_flows_mgmt as SR_flows_mgmt
 from structs import *
 from ospfv3 import *
+import json
 import time
 
 LOG = logging.getLogger('ryu.app.Te_controller')
@@ -82,6 +83,12 @@ class Te_controller(ControllerBase):
 
 		return Response(status=500)
 	
+	#REST API - Return the topology graph 
+	def get_topology(self, req, **_kwargs):
+		graph = Te_controller.graph.translate_to_dict()
+		LOG.debug("Graph returned: %s" % (graph))
+		return Response(content_type='application/json', body=json.dumps(graph))
+
 
 	def _process_hello(self, src_router_id, desig_router_id, nbors):
 		LOG.info("**HELLO**: src_router_id:%s, designated_router:%s, nbors:%s" % (src_router_id, desig_router_id, nbors))

@@ -94,6 +94,12 @@ class SR_rest_api(app_manager.RyuApp):
                        controller=Te_controller, action='receive_ospf_lsa',
                        conditions=dict(method=['POST']))
 
+	uri = ospf_monitor_path + '/get_topology'
+        mapper.connect(ospf_monitor, uri,
+                       controller=Te_controller, action='get_topology',
+                       conditions=dict(method=['GET']))
+
+
 
 
     @set_ev_cls([ofp_event.EventOFPStatsReply,

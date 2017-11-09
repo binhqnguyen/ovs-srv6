@@ -8,6 +8,24 @@ MSG_TYPES = { 1L: "HELLO",
               4L: "LSUPD",
               5L: "LSACK",
               }
+ADJ_DICT = {
+		'LSID': 1,
+		'W': 1,
+		'Prefixes' : 1,
+		'SrcRouterID' : 1,
+		'DstRouterID' : 1,
+		'SrcInterfaceID': 1,
+		'SrcInterfaceAddr': 1,
+		'DstInterfaceID': 1
+	}
+
+NODE_DICT = {
+		'ID': 1,
+		'IntraAdjs': 1,
+		'Prefixes' : 1,
+		'ActiveNbs' : 1
+	}
+
 
 class V(object):
 	def __init__(self, **kwargs):
@@ -116,7 +134,7 @@ class G(object):
 			self.G[src_router_id].IntraAdjs = []
 
 	def addAdj(self, src_router_id, dst_router_id):
-		if src_router_id not in G:
+		if src_router_id not in self.G:
 			return 1
 		src_router = self.G[src_router_id]
 		dst_router = V(ID=dst_router_id, IntraAdjs = [], Prefixes = [], ActiveNbs = {})
@@ -159,3 +177,18 @@ class G(object):
 		for ID in self.G:
 			self.G[ID].ActiveNbs = {}
 
+	def translate_to_dict(self):
+		V_dict = {}
+		G_dict = {}
+		for ID in self.G:
+			for f in NODE_DICT:
+				if f == 'IntraAdjs':
+					adj_dict = {}
+					for adj in self.G[ID].IntraAdjs:
+						for f1 in ADJ_DICT:
+							adj_dict[f1] = getattr(adj, f1)
+					V_dict['IntraAdjs'] = adj_dict
+				else:
+					V_dict[f] = getattr(self.G[ID], f)
+			G_dict[ID] = V_dict
+		return G_dict

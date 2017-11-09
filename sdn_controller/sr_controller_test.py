@@ -28,6 +28,7 @@ from collections import defaultdict
 from ofctl_rest_listener import SR_rest_api
 from sr_flows_mgmt import SR_flows_mgmt
 from parameters import *
+from TE.te_controller import *
 import logging
 
 LOG = logging.getLogger('ryu.app.SR_controller')
@@ -40,6 +41,9 @@ class SR_controller(app_manager.RyuApp):
         	'dpset': dpset.DPSet,
         	'wsgi': WSGIApplication,
     	}
+	#Network topology graph
+	graph = Te_controller.graph
+
 	NUM_OF_OVS_SWITCHES = 1
 	ARP_REQUEST_TYPE = 0x0806 
 	IPV6_TYPE = 0x86DD
