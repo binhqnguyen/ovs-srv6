@@ -96,6 +96,11 @@ class SR_rest_api(app_manager.RyuApp):
 
 	uri = ospf_monitor_path + '/get_topology'
         mapper.connect(ospf_monitor, uri,
+                       controller=Te_controller, action='handle_get_topology_OPTIONS',
+                       conditions=dict(method=['OPTIONS']))
+
+	uri = ospf_monitor_path + '/get_topology'
+        mapper.connect(ospf_monitor, uri,
                        controller=Te_controller, action='get_topology',
                        conditions=dict(method=['GET']))
 

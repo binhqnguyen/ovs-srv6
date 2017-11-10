@@ -83,11 +83,26 @@ class Te_controller(ControllerBase):
 
 		return Response(status=500)
 	
+	#REST API - Return the topology graph, handle OPTIONS request in preflight request 
+	def handle_get_topology_OPTIONS(self, req, **_kwargs):
+	        headers = { 
+			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Methods': 'GET, POST',
+			'Access-Control-Allow-Headers': 'Origin, Content-Type',
+                        'Content-Type':'application/json'}
+		return Response(content_type='application/json', headers=headers)
+
+
 	#REST API - Return the topology graph 
 	def get_topology(self, req, **_kwargs):
 		graph = Te_controller.graph.translate_to_dict()
 		LOG.debug("Graph returned: %s" % (graph))
-		return Response(content_type='application/json', body=json.dumps(graph))
+ 	        headers = { 
+			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Methods': 'GET, POST',
+			'Access-Control-Allow-Headers': 'Origin, Content-Type',
+                        'Content-Type':'application/json'}
+		return Response(content_type='application/json', body=json.dumps(graph), headers=headers)
 
 
 	def _process_hello(self, src_router_id, desig_router_id, nbors):

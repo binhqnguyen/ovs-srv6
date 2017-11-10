@@ -178,9 +178,9 @@ class G(object):
 			self.G[ID].ActiveNbs = {}
 
 	def translate_to_dict(self):
-		V_dict = {}
 		G_dict = {}
 		for ID in self.G:
+			V_dict = {}
 			for f in NODE_DICT:
 				if f == 'IntraAdjs':
 					adj_dict = {}
