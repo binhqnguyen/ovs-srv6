@@ -1,6 +1,7 @@
 #!/usr/bin/python2.7
 import logging as LOG
-import time, sys
+import time, sys, re
+from collections import defaultdict
 
 MSG_TYPES = { 1L: "HELLO",
               2L: "DBDESC",
@@ -192,3 +193,97 @@ class G(object):
 					V_dict[f] = getattr(self.G[ID], f)
 			G_dict[ID] = V_dict
 		return G_dict
+
+	def translate_to_dict_netjson(self):
+		netjson = {
+		    "type": "NetworkGraph",
+		    "label": "Traffic Engineer Topology Graph",
+		    "protocol": "OSPFv3",
+		    "version": "0.0.0.1",
+		    "metric": "Bandwidth",
+		}
+		nodes = []
+		links = []
+		for ID in self.G:
+			#node
+			n = self.G[ID]
+			
+			properties = {
+				"Node segment": self._get_node_segments(n),
+				"Prefixes" : self._get_prefixes(n),
+			}
+			node = {
+				"id": ID,
+				"lable": "Router %s" % ID,
+				"properties":properties
+			}
+			nodes.append(node)
+			#adjacencies
+			found_adjs = {}
+			for adj in self.G[ID].IntraAdjs:
+				if adj.LSID == 0 or adj.D == 1:
+					continue
+				[src_adj_segment, dst_adj_segment] = self._get_adj_segments(self.G, adj)
+				link_properties = {
+					"Linkstate ID": adj.LSID,
+					"Prefixes": adj.Prefixes,
+					"Src Interface Address": src_adj_segment,
+					"Dst Interface Address": dst_adj_segment,
+					"OSPF cost (bandwidth)": "%s Mbps" % adj.W,
+				}
+				edge = {
+					"source": adj.SrcRouterID,
+					"target": adj.DstRouterID, 
+					"cost": adj.W,
+					"properties": link_properties
+				}
+				links.append(edge)
+		netjson["nodes"] = nodes
+		netjson["links"] = links
+		return netjson
+
+	def _get_prefixes(self, node):
+		for adj in node.IntraAdjs:
+			if adj.LSID == 0:
+				return adj.Prefixes
+		return None
+
+
+	def _get_node_segments(self, node):
+		segs = []
+		for adj in node.IntraAdjs:
+			if adj.LSID == 0:
+				for p in adj.Prefixes:
+					if re.match(r'.*::1', p) != None:
+						segs.append(p)
+		return segs
+
+	def _get_adj_segments(self, graph, adj):
+		src_adj_segment = self._generate_adj_segment(adj.SrcInterfaceAddr, adj.Prefixes)
+		reversed_adj = None
+		dst_adj_segment = None
+		for r_adj in graph[adj.DstRouterID].IntraAdjs:
+			if r_adj.DstRouterID == adj.SrcRouterID:
+				reversed_adj = r_adj
+		if reversed_adj != None:
+			dst_adj_segment = self._generate_adj_segment(reversed_adj.SrcInterfaceAddr, reversed_adj.Prefixes)
+		return [src_adj_segment, dst_adj_segment]
+			
+
+	#Generate a SR adjacency segment using link-local address and prefix.
+	#This is a bit cheating because for this to work the adj segment
+	#(or router interface's address) must be *assigned* such that 
+	#its 2nd portion is exactly the same as the 2nd portion of the link-local 
+	#address. To make it clean, OSPF must be extended to advertise 
+	#adjacency segment addresses. 
+	def _generate_adj_segment(self, ll_addr, prefixes):
+		if len(prefixes) == 0:
+			return None
+		longest_prefix = prefixes[0]
+		for p in prefixes:
+			if len(p) > len(longest_prefix):
+				longest_prefix = p
+		second_portion = ":".join(ll_addr.split(":")[3:])
+		first_portion = longest_prefix[:-1]
+		LOG.debug("_generate_adj_segment: 1st protion:%s, 2nd portion:%s" % (first_portion, second_portion))
+		return "%s%s" % (first_portion, second_portion)

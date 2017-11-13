@@ -62,13 +62,20 @@ class North_api(ControllerBase):
 			return Response(status=200)
         	return Response(status=500)
 
+	def handle_http_options(self, req, **_kwargs):
+		headers = {
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'GET, POST',
+                        'Access-Control-Allow-Headers': 'Origin, Content-Type',
+                        'Content-Type':'application/json'}
+                return Response(content_type='application/json', headers=headers)
+
 	#Usage: curl --data "dpid=12345&match=123,456&actions=src_ip=1,dst_ip=2" http://0.0.0.0:8080/flow_mgmt/insert
 	def insert_single_flow(self, req, **_kwargs):
         	post = req.POST
 		A = Actions()
 		M = Match()
 		SR = SR_flows_mgmt()
-
             	if len(post) < 3 or "actions" not in post or "dpid" not in post:
                 	LOG.info("INVALID POST values: %s" % post)
                		return Response(status=404)

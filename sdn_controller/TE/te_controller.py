@@ -63,6 +63,7 @@ class Te_controller(ControllerBase):
 				t = int(lsa['T'])
 				lsid = int(lsa['H']['LSID'])
 				advrtr = int(lsa['H']['ADVRTR'])
+				LOG.info(type(lsa['H']['ADVRTR']))
 
 				if LSAV3_TYPES[t] == "ROUTER":
 					self._process_rtr_lsa(lsa['V'], lsid, advrtr)
@@ -104,6 +105,15 @@ class Te_controller(ControllerBase):
                         'Content-Type':'application/json'}
 		return Response(content_type='application/json', body=json.dumps(graph), headers=headers)
 
+	def get_topology_netjson(self, req, **_kwargs):
+		graph = Te_controller.graph.translate_to_dict_netjson()
+ 	        headers = { 
+			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Methods': 'GET, POST',
+			'Access-Control-Allow-Headers': 'Origin, Content-Type',
+                        'Content-Type':'application/json'}
+		LOG.debug("Graph returned: %s" % (graph))
+		return Response(content_type='application/json', body=json.dumps(graph), headers=headers)
 
 	def _process_hello(self, src_router_id, desig_router_id, nbors):
 		LOG.info("**HELLO**: src_router_id:%s, designated_router:%s, nbors:%s" % (src_router_id, desig_router_id, nbors))

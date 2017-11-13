@@ -1,5 +1,5 @@
 //MODIFY this before run
-var url = "http://node1.srv6.phantomnet.emulab.net:8080/ospf_monitor/get_topology";
+var url = "http://node1.srv6.phantomnet.emulab.net:8080/ospf_monitor/get_topology_netjson";
 var graph = {};
 /*
 while (1){

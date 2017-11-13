@@ -1,3 +1,5 @@
+#!/usr/bin/python2.7
+
 #Copyright Binh Nguyen University of Utah (binh@cs.utah.edu)
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +14,6 @@
 #See the License for the specific language governing permissions and
 #limitations under the License.
 
-#!/usr/bin/python
 import logging
 
 import json
@@ -88,6 +89,11 @@ class SR_rest_api(app_manager.RyuApp):
         mapper.connect(flow_mgmt, uri,
                        controller=North_api, action='insert_single_flow',
                        conditions=dict(method=['POST']))
+     	uri = flow_mgmt_path + '/insert'
+        mapper.connect(flow_mgmt, uri,
+                       controller=North_api, action='handle_http_options',
+                       conditions=dict(method=['OPTIONS']))
+
 
         uri = ospf_monitor_path + '/lsa_put'
         mapper.connect(ospf_monitor, uri,
@@ -103,6 +109,12 @@ class SR_rest_api(app_manager.RyuApp):
         mapper.connect(ospf_monitor, uri,
                        controller=Te_controller, action='get_topology',
                        conditions=dict(method=['GET']))
+
+	uri = ospf_monitor_path + '/get_topology_netjson'
+        mapper.connect(ospf_monitor, uri,
+                       controller=Te_controller, action='get_topology_netjson',
+                       conditions=dict(method=['GET']))
+
 
 
 
