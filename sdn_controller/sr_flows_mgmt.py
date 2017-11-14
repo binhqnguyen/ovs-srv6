@@ -32,6 +32,17 @@ LOG.setLevel(logging.DEBUG)
 
 class SR_flows_mgmt(object):
   dpid_to_datapath = {}
+  MATCH_FIELDS = {
+	'in_port' : 'int',
+	'ipv6_dst' : 'str', 
+	'eth_type' : 'hex',
+	'ipv6_src' : 'str',
+	'eth_dst' : 'str',
+	'eth_src' : 'str',
+	'dl_src' : 'str',
+	'dl_dst' : 'str',
+	'out_port' : 'int'
+  }
 
   def _del_flows(self, datapath):
       empty_match = datapath.ofproto_parser.OFPMatch()
@@ -87,16 +98,35 @@ class SR_flows_mgmt(object):
   def __init__(self, *args, **kwargs):
     super(SR_flows_mgmt, self).__init__(*args, **kwargs)
 
+  def _casting(self, value, t):
+	import importlib
+	if t == "hex":
+		return int(value, 16)
+
+	try:
+		module = importlib.import_module('__builtin__')
+		cls = getattr(module, t)
+	except AttributeError:
+		return None
+	return cls(value)
+ 
+  def _construct_match_args_list(self, match):
+    ret = {}
+    for key in match:
+	if key in self.MATCH_FIELDS:
+		if match[key] == None:
+			continue
+		ret[key] = self._casting(match[key], self.MATCH_FIELDS[key])
+		if ret[key] == None:
+			LOG.error("Can't cast match's field %s to type %s" % (key, self.MATCH_FIELDS[key]))
+	else:
+		LOG.warn("Field %s is not defined" % key)
+    return ret
+	
 
   def _construct_match(self, parser, match):
-    m = parser.OFPMatch(
-	in_port=int(match['in_port']),
-	ipv6_dst=match['ipv6_dst'], 
-	eth_type=int(match['eth_type'],16),
-	ipv6_src=match['ipv6_src'],
-	eth_dst=match['dl_dst'],
-	eth_src=match['dl_src']
-	)
+    args = self._construct_match_args_list(match)
+    m = parser.OFPMatch(**args)
     return m
 
   def _construct_actions(self, parser, actions):
@@ -107,7 +137,6 @@ class SR_flows_mgmt(object):
     for x in actions:
 	if x == "mod_dl_dst" and actions[x]:
         	a.append(parser.OFPActionSetField(eth_dst=actions['mod_dl_dst']))
-
     a.append(parser.OFPActionOutput(int(actions['output'])))
     return a
 
