@@ -11,7 +11,7 @@ fi
 
 ovs-vsctl del-br br0
 
-get_interface="perl /proj/PhantomNet/binh/simeca_scripts/get_interface_map.pl"
+get_interface="perl ./get_interface_map.pl"
 sr_inport=$($get_interface | grep -w $inport_name | awk '{print $3}')
 sr_outport=$($get_interface | grep -w $outport_name | awk '{print $3}')
 
@@ -19,6 +19,15 @@ sr_outport=$($get_interface | grep -w $outport_name | awk '{print $3}')
 ovs-vsctl add-br br0
 #ovs-vsctl set-fail-mode br0 standalone
 ovs-vsctl set-fail-mode br0 secure
+host=$(hostname | awk -F"." '{print $1}')
+if [ "$host" == "node1" ]; then
+	ovs-vsctl set bridge br0 other-config:datapath-id=0000000000000002
+fi
+if [ "$host" == "node5" ]; then
+	ovs-vsctl set bridge br0 other-config:datapath-id=0000000000000003
+fi
+
+
 ifconfig $sr_inport 0.0.0.0
 ifconfig $sr_outport 0.0.0.0
 
