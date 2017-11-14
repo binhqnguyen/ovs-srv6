@@ -2,7 +2,7 @@ var url = "http://node1.srv6.phantomnet.emulab.net:8080/ospf_monitor/get_topolog
 var graph;
 d3.netJsonGraph(url);
 graph = fetch_graph(url);
-console.log(graph);
+console.log("Displayed graph: " + graph);
 
 
 

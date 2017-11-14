@@ -15,24 +15,22 @@
 </head>
 <body>
 	<div id="legend">
-		<!--<form id="te_form" method="post">-->
-		 	<h1>Traffic engineer</h1>
+		<form id="te_form" method="post">
+		 	<h1>Traffic engineer implementation</h1>
 		 	If going to:<br>
-			<input type="text" id="match" name="match" size="35" value="2001::204">
+			<input type="text" id="match" name="match" size="70" value="2001::203">
 			<br>
 			Then use segments:<br>
-			<input type="text" id="actions" name="actions" size="35" value="1,2,3">
+			<input type="text" id="actions" name="actions" size="70" value="2001::204,2001::205">
 			<br>
 			SDN controller:<br>
-			<input type="text" id="controller" name="controller" size="35" value="http://node1.srv6.phantomnet.emulab.net">
+			<input type="text" id="controller" name="controller" size="70" value="http://node1.srv6.phantomnet.emulab.net">
 			<br><br>
 			<input onclick="submit_te()" type="submit" value="Submit">
-		<!--</form> -->
+		</form>
 	</div>
 
 	<script type="text/javascript" src="te_app.js"> </script>
 
-
-    <!--<script>d3.netJsonGraph("./data/netjson-custom.json");</script>-->
 </body>
 </html>
