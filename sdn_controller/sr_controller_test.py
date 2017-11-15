@@ -44,7 +44,9 @@ class SR_controller(app_manager.RyuApp):
 	#Network topology graph
 	graph = Te_controller.graph
 
-	NUM_OF_OVS_SWITCHES = 1
+	#NEEDED TO CHANGE BEFORE RUNNING!
+	NUM_OF_OVS_SWITCHES = 2
+
 	ARP_REQUEST_TYPE = 0x0806 
 	IPV6_TYPE = 0x86DD
 	PARAMETER_FILE = "/opt/net_info.sh"
@@ -218,6 +220,20 @@ class SR_controller(app_manager.RyuApp):
 	    actions.append(parser.OFPActionOutput(parameters.in_port))
 	    self._add_flow(datapath,0,match,actions)	#lowest priority
 
+	def _push_bridging_flows(self, datapath, parser):
+	    LOG.info("Pushing bridging flows for all other IPV6 packets on OVS: %s" % datapath.address[0])
+	    match = parser.OFPMatch(in_port=1,eth_type=SR_controller.IPV6_TYPE)
+	    #match = parser.OFPMatch(in_port=1,eth_type=0x0800)
+	    actions = []
+	    actions.append(parser.OFPActionOutput(2))
+	    self._add_flow(datapath,0,match,actions) #lowest priority
+
+	    match = parser.OFPMatch(in_port=2,eth_type=SR_controller.IPV6_TYPE)
+	    #match = parser.OFPMatch(in_port=2,eth_type=0x0800)
+	    actions = []
+	    actions.append(parser.OFPActionOutput(1))
+	    self._add_flow(datapath,0,match,actions)	#lowest priority
+
 
 
 	def __init__(self, *args, **kwargs):
@@ -248,11 +264,13 @@ class SR_controller(app_manager.RyuApp):
 		parameters = self.get_parameters(ovs_address)
 		self.del_flows(datapath)
 		self.dpid_to_datapath[datapath.id] = datapath
+		self._push_bridging_flows(datapath, parser)
 		LOG.info("New OVS connected: %d, still waiting for %s OVS to join ..." % (datapath.id, self.NUM_OF_OVS_SWITCHES-1-len(self.dpset.get_all())))
 		if len(self.dpset.get_all()) == self.NUM_OF_OVS_SWITCHES-1:
 			try:
 				SR_rest_api(dpset=self.dpset, wsgi=self.wsgi);
 				SR_flows_mgmt.set_dpid_to_datapath(self.dpid_to_datapath)
+				LOG.info(self.dpid_to_datapath)
 				LOG.info("Northbound REST started!")
 			except Exception, e:
 				LOG.error("Error when start the NB API: %s" % e)

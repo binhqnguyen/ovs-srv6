@@ -85,9 +85,9 @@ class SR_flows_mgmt(object):
         datapath.send_msg(mod)
 
   def _get_datapath_from_dpid(self, dpid):
-    for dpid in self.dpid_to_datapath:
-      if self.dpid_to_datapath[dpid]:
-        return self.dpid_to_datapath[dpid], self.dpid_to_datapath[dpid].ofproto_parser
+    dpid = int(dpid)
+    if dpid in self.dpid_to_datapath:
+    	return self.dpid_to_datapath[dpid], self.dpid_to_datapath[dpid].ofproto_parser
     return None, None
 
 
@@ -110,11 +110,39 @@ class SR_flows_mgmt(object):
 		return None
 	return cls(value)
  
+  def _generate_ipv6(self, ipv6_str):
+	if "/" not in ipv6_str:
+		return ipv6_str
+	ipv6_addr = ipv6_str.split("/")[0]
+	prefix_count = int(ipv6_str.split("/")[1])
+	if prefix_count > 128:
+		LOG.error("Invalid ipv6 address %s" % ipv6_str)
+		return None
+	if prefix_count == 128:
+		return (ipv6_addr, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
+	prefix = ""
+	for i in range(1, prefix_count/4+1):
+		prefix += "f"
+		if i % 4 == 0 and i > 0:
+			prefix += ":"
+	if prefix[-1:] == ":":
+		prefix += ":"
+	else:
+		prefix += "::"
+	return (ipv6_addr, prefix)
+
+	
   def _construct_match_args_list(self, match):
     ret = {}
+    #ipv6_src=('2001:db8:bd05:1d2:288a:1fc0:1:10ee',
+    #             'ffff:ffff:ffff:ffff::'),
     for key in match:
 	if key in self.MATCH_FIELDS:
 		if match[key] == None:
+			continue
+		if key == "ipv6_dst": #especially handle ipv6 with prefix
+			ipv6_dst = self._generate_ipv6(match[key])
+			ret[key] = ipv6_dst
 			continue
 		ret[key] = self._casting(match[key], self.MATCH_FIELDS[key])
 		if ret[key] == None:
