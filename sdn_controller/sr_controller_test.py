@@ -220,6 +220,10 @@ class SR_controller(app_manager.RyuApp):
 	    actions.append(parser.OFPActionOutput(parameters.in_port))
 	    self._add_flow(datapath,0,match,actions)	#lowest priority
 
+	#Make the OVS a bridge to be transparent to the end-host.
+	#The bridging rules have the lowest priority (0). So, without other rules the OVS is a bridge. 
+	#Other rules (which have higher priority) will take be applied 
+	#in the datapath *before* the bridging rules.  
 	def _push_bridging_flows(self, datapath, parser):
 	    LOG.info("Pushing bridging flows for all other IPV6 packets on OVS: %s" % datapath.address[0])
 	    match = parser.OFPMatch(in_port=1,eth_type=SR_controller.IPV6_TYPE)
@@ -270,6 +274,7 @@ class SR_controller(app_manager.RyuApp):
 			try:
 				SR_rest_api(dpset=self.dpset, wsgi=self.wsgi);
 				SR_flows_mgmt.set_dpid_to_datapath(self.dpid_to_datapath)
+				LOG.info("Datapath objects:")
 				LOG.info(self.dpid_to_datapath)
 				LOG.info("Northbound REST started!")
 			except Exception, e:
