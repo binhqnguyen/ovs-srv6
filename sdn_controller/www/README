@@ -1,0 +1,10 @@
+Web-portal to interact with segment routing implementation (https://gitlab.flux.utah.edu/binh/ovs-srv6)
+-------------------------------------------------------------------------------------------------------
+
+1. Install:
+	+ Install Apache2 web server: sudo apt-get update; sudo apt-get install -y apache2
+	+ Replace SDN controller name: cd ~/ovs-srv6/sdn_controller/www/; ./replace_sdn_controller_name.sh
+	+ Copy the folder ~/ovs-srv6/sdn_controller/www to /var/: sudo cp -r ~/ovs-srv6/sdn_controller/www /var/
+
+2. Access the web-portal:
+	+ Open a browser, enter: http://<SDN controller>/web-portal
