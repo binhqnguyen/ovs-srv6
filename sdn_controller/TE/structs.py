@@ -138,13 +138,17 @@ class G(object):
 		if src_router_id not in self.G:
 			return 1
 		src_router = self.G[src_router_id]
-		dst_router = V(ID=dst_router_id, IntraAdjs = [], Prefixes = [], ActiveNbs = {})
+		if dst_router_id in self.G:
+			dst_router = self.G[dst_router_id]
+		else:
+			dst_router = V(ID=dst_router_id, IntraAdjs = [], Prefixes = [], ActiveNbs = {})
 		#src->dst
 		src_router_adj = IntraAdj(LSID=None, W=None, Prefixes=None, SrcRouterID=src_router_id, DstRouterID = dst_router_id, DstRouter=dst_router, SrcInterfaceID=None, SrcInterfaceAddr=None, DstInterfaceID=None)
 		src_router.IntraAdjs.append(src_router_adj)
 		#dst->src
 		dst_router_adj = IntraAdj(LSID=None, W=None, Prefixes=None, SrcRouterID=dst_router_id, DstRouterID = src_router_id, DstRouter=src_router, SrcInterfaceID=None, SrcInterfaceAddr=None, DstInterfaceID=None)
 		dst_router.IntraAdjs.append(dst_router_adj)
+		self.addV(dst_router)
 		return 0
 
 	def remove_duplicated_adjs(self, router_id):
@@ -167,6 +171,7 @@ class G(object):
 			for adj in self.G[ID].IntraAdjs:
 				if adj.D == 0:
 					LOG.info("\tsrcRtrID:%s,LSID:%s,W:%s,Prefixes:%s,srcIntfID:%s,srcIntfAddr:%s,dstIntfID:%s,dstRtrId:%s\n" % (adj.SrcRouterID, adj.LSID, adj.W, adj.Prefixes, adj.SrcInterfaceID, adj.SrcInterfaceAddr, adj.DstInterfaceID, adj.DstRouterID))
+					print ("\tsrcRtrID:%s,LSID:%s,W:%s,Prefixes:%s,srcIntfID:%s,srcIntfAddr:%s,dstIntfID:%s,dstRtrId:%s\n" % (adj.SrcRouterID, adj.LSID, adj.W, adj.Prefixes, adj.SrcInterfaceID, adj.SrcInterfaceAddr, adj.DstInterfaceID, adj.DstRouterID))
 
 	def printNB(self):
 		ret = ""
