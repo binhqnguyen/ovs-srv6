@@ -18,7 +18,7 @@
 		<form id="te_form" method="post">
 		 	<h1>Traffic engineer implementation</h1>
             SDN controller:<br>
-			<input type="text" id="controller" name="controller" size="55" value="http://SDN_CONTROLLER">
+			<input type="text" id="controller" name="controller" size="55" value="http://node1.srv6.safeedge.emulab.net">
             <br>
 		 	From:<br>
 			<input type="text" id="from" name="from" size="55" value="2">
@@ -29,6 +29,8 @@
             Src-Dst Segments:
             <div id="outer">
                 <div id="segments">
+                    <!--<input type="radio" name="seg_type[]" value="node" checked>Node-->
+                    <!--<input type="radio" name="seg_type" value="adj" checked>Adjacent-->
                     #1: 
                     <select name="seg_types[]">
                            <option value="node_type">Node Seg.</option>
@@ -38,10 +40,13 @@
                 </div>
             </div>
             <input onclick="add_segment('segments')" type="button" value="Add another segment">
+            <input onclick="del_segment('segments')" type="button" value="Delete">
             <br>
             Dst-Src Segments:
             <div id="outer">
                 <div id="rev_segments">
+                    <!--<input type="radio" name="seg_type[]" value="node" checked>Node-->
+                    <!--<input type="radio" name="seg_type" value="adj" checked>Adjacent-->
                     #1: 
                     <select name="rev_seg_types[]">
                            <option value="node_type">Node Seg.</option>
@@ -51,7 +56,9 @@
                 </div>
             </div>
             <input onclick="add_rev_segment('rev_segments')" type="button" value="Add another segment">
+            <input onclick="del_rev_segment('rev_segments')" type="button" value="Delete">
 
+            <!--<input onclick="add_field_x()" type="button" value="Add another segment">-->
             <br>
             <br>
             <input onclick="submit_te()" type="submit" value="Submit">

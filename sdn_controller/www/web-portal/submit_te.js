@@ -90,11 +90,17 @@ function submit_te(){
 		if (IS_DEBUG==1)
 			window.alert("Sent dst_post_data " + dst_post_data[i]);
 	}
-	window.alert("Done installing the path: from: " + from + ", to: "+to+", path: "+seg_values + "SDN controller: "+controller);
+	window.alert("Done installing the path: from: " + from + ", to: "+to+", src-dst path: "+ get_path(seg_values) + ", dst-src path: " + get_path(rev_seg_values) + " SDN controller: "+controller);
 }
 
 
-
+function get_path(seg_values){
+    var vals = [];
+	for (var i = 0; i < seg_values.length; i++){
+        vals.push(seg_values[i].value);
+    }
+    return vals.join(",");
+}
 function send_POST_request(request, url, post_data, is_async){
 	request.open("POST", url, is_async);
 	//Send POST request with POST data in the format: "dpid=123&match=123&action=..."
@@ -320,11 +326,19 @@ function add_segment(div_name){
         }
         else {
                 var newdiv = document.createElement('div');
+                newdiv.setAttribute('id', 'seg_'+counter);
                 newdiv.innerHTML = "#" + (counter + 1) + ": <select name='seg_types[]'> <option value='node_type'>Node Seg.</option> <option value='adj_type'>Adjacent Seg.</option> </select> <input type='text' id='seg_values' name='seg_values[]' size='10' value='2'>";
                 document.getElementById(div_name).appendChild(newdiv);
                 counter++;
         }
 }
+
+function del_segment(div_name){
+        counter--;
+        var div = document.getElementById('seg_'+ counter);
+        div.parentNode.removeChild(div);
+}
+
 
 function add_rev_segment(div_name){
         if (rev_counter == limit)  {
@@ -332,9 +346,16 @@ function add_rev_segment(div_name){
         }
         else {
                 var newdiv = document.createElement('div');
+                newdiv.setAttribute('id', 'rev_seg_'+rev_counter);
                 newdiv.innerHTML = "#" + (rev_counter + 1) + ": <select name='rev_seg_types[]'> <option value='node_type'>Node Seg.</option> <option value='adj_type'>Adjacent Seg.</option> </select> <input type='text' id='rev_seg_values' name='rev_seg_values[]' size='10' value='2'>";
                 document.getElementById(div_name).appendChild(newdiv);
                 rev_counter++;
         }
+}
+
+function del_rev_segment(div_name){
+        rev_counter--;
+        var div = document.getElementById('rev_seg_'+rev_counter);
+        div.parentNode.removeChild(div);
 }
 
