@@ -52,3 +52,16 @@
         #legend .fiber{ border-color: #1f77b4 }
         #legend .vpn{ border-color: purple }
 
+       #outer {
+            margin: 0 auto; /*center*/
+            width:300px;
+       }
+
+       #segments {
+           margin-left:-50px; 
+           margin-right:10px;
+        }
+       #rev_segments {
+           margin-left:-50px; 
+           margin-right:10px;
+        }

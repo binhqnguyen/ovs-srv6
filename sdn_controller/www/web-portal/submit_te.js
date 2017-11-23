@@ -1,12 +1,5 @@
 //Submit REST http requests to the SDN controller to install the path entered by user in the HTTP form.
 function submit_te(){
-	var from = document.getElementById("from").value;
-	var to = document.getElementById("to").value;
-	var controller = document.getElementById("controller").value;
-	var seg_types = document.getElementsByName("seg_type");
-	var segs = document.getElementById("segs").value.split(",");
-	var reversed_segs = document.getElementById("segs").value.split(",").reverse();
-	var seg_type = get_segment_type_option(seg_types);	//node or adj
 	//Facing corenetwork: port 1
 	//Facing host: port 2
 	//Segment routing encapsulation port: port 5
@@ -18,8 +11,21 @@ function submit_te(){
 	const FLOW_INSERT_API=":8080/flow_mgmt/insert"
 	const IS_DEBUG = 0;
 
+	var from = document.getElementById("from").value;
+	var to = document.getElementById("to").value;
+	var controller = document.getElementById("controller").value;
+	var seg_types = document.getElementsByName("seg_types[]");
+    var seg_values = document.getElementsByName("seg_values[]");
+	var rev_seg_types = document.getElementsByName("rev_seg_types[]");
+    var rev_seg_values = document.getElementsByName("rev_seg_values[]");
+
+    if (IS_DEBUG == 1){
+        window.alert("# segments: " + seg_values.length);
+        window.alert("# rev segments: " + rev_seg_values.length);
+    }
+
 	//TODO: check if segments path is valid: eg, it starts with the "from" node and ends with the "to" node, etc.
-	check_valid_values(from, to, controller, segs);
+	check_valid_values(from, to, controller, seg_values);
 
 	var url = controller+FLOW_INSERT_API;
 	var src_dpid = get_dpid(from);
@@ -33,10 +39,10 @@ function submit_te(){
 	}
 	if (IS_DEBUG==1)
 		window.alert("Src match: " + src_match + "\nDst match: " + dst_match);
-	var src_actions = get_actions(segs, seg_type, graph);
-	var dst_actions = get_actions(reversed_segs, seg_type, graph);
+	var src_actions = get_actions(seg_values, seg_types, graph);
+	var dst_actions = get_actions(rev_seg_values, rev_seg_types, graph);
 	if (src_actions.length == 0 || dst_actions.length == 0){
-		window.alert("Can't find actions for path " + segs);
+		window.alert("Can't find actions for path " + seg_values);
 		return;
 	}
 	if (IS_DEBUG==1)
@@ -44,7 +50,7 @@ function submit_te(){
 	var src_post_data = construct_post_data(src_dpid, src_match, ETH_TYPE, src_actions, IN_PORT, SR_ENCAP_PORT, PRIORITY);
 	var dst_post_data = construct_post_data(dst_dpid, dst_match, ETH_TYPE, dst_actions, IN_PORT, SR_ENCAP_PORT, PRIORITY);
 	if (src_post_data.length == 0 || dst_post_data.length == 0){
-		window.alert("Can't construct post data for path " + segs);
+		window.alert("Can't construct post data for path " + seg_values);
 		return;
 	}
 	if (IS_DEBUG==1){
@@ -84,8 +90,10 @@ function submit_te(){
 		if (IS_DEBUG==1)
 			window.alert("Sent dst_post_data " + dst_post_data[i]);
 	}
-	window.alert("Done installing the path: from: " + from + ", to: "+to+", path: "+segs + "SDN controller: "+controller);
+	window.alert("Done installing the path: from: " + from + ", to: "+to+", path: "+seg_values + "SDN controller: "+controller);
 }
+
+
 
 function send_POST_request(request, url, post_data, is_async){
 	request.open("POST", url, is_async);
@@ -212,35 +220,45 @@ function get_match(node, graph){
 	
 }
 
+//TODO
+function check_valid_segments(seg_values, seg_types){
+    return 0;
+}
+
 //Generate the SDN 'actions' field from a list of nodes describing the path.
 //Return: list of ipv6 addresses
-function get_actions(segs, seg_type, graph){
+function get_actions(seg_values, seg_types, graph){
 	ret = "";
 	ipv6s = [];
-	if (segs.length == 0)
+	if (seg_values.length == 0)
 		return ret;
+    if (check_valid_segments() != 0){
+        window.alert("Invalid segments entered. Make sure:\n(1) 1st segment is always a node segment.\n(2) 1st segment is always the *from* node\n(3) last segment is always the *to* node.");
+    }
 
-	if (seg_type == "node"){
-		for (var i = 0; i < segs.length; i++) {
-			var node = get_node_by_id(graph, segs[i]);
-			if (node != null)
-				ipv6s.push("ipv6_dst=" + node.properties['Node segment']);
-		}
-	}
-	if (seg_type == "adj"){
-		var node = get_node_by_id(graph, segs[0]);
-		if (node != null)
-			ipv6s.push("ipv6_dst="+node.properties['Node segment']); //First segment is *always* first node's node segment.
-		for (var i = 0; i < segs.length-1; i++) {
-			var edge_src = segs[i];
-			var edge_dst = segs[i+1];
-			var edge = get_edge_from_src_dst(edge_src, edge_dst, graph);
-			if (edge != null)
-				ipv6s.push("ipv6_dst=" + edge.properties['Dst Interface Address']);
-		}
-	}
+    //First segment is *always* first node's node segment.
+    var node = get_node_by_id(graph, seg_values[0].value);
+    if (node != null)
+        ipv6s.push("ipv6_dst="+node.properties['Node segment']); 
+
+    for (var i = 1; i < seg_values.length; i++) {
+        if (seg_types[i].value == "node_type"){
+                var node = get_node_by_id(graph, seg_values[i].value);
+                if (node != null)
+                    ipv6s.push("ipv6_dst=" + node.properties['Node segment']);
+        }
+
+        if (seg_types[i].value == "adj_type"){
+            var edge_src = seg_values[i-1].value;
+            var edge_dst = seg_values[i].value;
+            var edge = get_edge_from_src_dst(edge_src, edge_dst, graph);
+            if (edge != null)
+                ipv6s.push("ipv6_dst=" + edge.properties['Dst Interface Address']);
+        }
+    }
 	ret = ipv6s.join(",");
 	return ret;
+    
 } 
 
 function get_node_by_id(graph, id){
@@ -291,3 +309,32 @@ function fetch_graph(url){
         })();
         return graph;
 }
+
+var limit = 4;
+var counter = 1;
+var rev_counter = 1;
+
+function add_segment(div_name){
+        if (counter == limit)  {
+               alert("Number of segments reaches MAXIMUM value " + counter );
+        }
+        else {
+                var newdiv = document.createElement('div');
+                newdiv.innerHTML = "#" + (counter + 1) + ": <select name='seg_types[]'> <option value='node_type'>Node Seg.</option> <option value='adj_type'>Adjacent Seg.</option> </select> <input type='text' id='seg_values' name='seg_values[]' size='10' value='2'>";
+                document.getElementById(div_name).appendChild(newdiv);
+                counter++;
+        }
+}
+
+function add_rev_segment(div_name){
+        if (rev_counter == limit)  {
+               alert("Number of segments reaches MAXIMUM value " + rev_counter );
+        }
+        else {
+                var newdiv = document.createElement('div');
+                newdiv.innerHTML = "#" + (rev_counter + 1) + ": <select name='rev_seg_types[]'> <option value='node_type'>Node Seg.</option> <option value='adj_type'>Adjacent Seg.</option> </select> <input type='text' id='rev_seg_values' name='rev_seg_values[]' size='10' value='2'>";
+                document.getElementById(div_name).appendChild(newdiv);
+                rev_counter++;
+        }
+}
+
