@@ -24,8 +24,8 @@ function submit_te(){
         window.alert("# rev segments: " + rev_seg_values.length);
     }
 
-	//TODO: check if segments path is valid: eg, it starts with the "from" node and ends with the "to" node, etc.
-	check_valid_values(from, to, controller, seg_values);
+	if (0 != check_valid_values(from, to, controller, seg_values, rev_seg_values))
+        return;
 
 	var url = controller+FLOW_INSERT_API;
 	var src_dpid = get_dpid(from);
@@ -121,9 +121,37 @@ function get_segment_type_option(seg_types){
 
 }
 
-//TODO
-function check_valid_values(from, to, controller, segs){
-	return;
+//Check if the segments are valid.
+//Invalid cases:
+//  1. 1st segment in src-dst/dst-src direction does not match the from/to node respectively.
+//  2. last segment in src-dst/dst-src direction does not match the to/from node respectively.
+//  3. TODO: This does *not* check if an adjacent segment is valid, eg, there is no such an adjacent segment from the previous node. 
+//Return: 0 if valid.
+function check_valid_values(from, to, controller, segs, rev_segs){
+    if (segs.length <= 1 || rev_segs.length <= 1){
+        window.alert("Not enough segments specified. Required >=2 segments.");
+        return 1;
+    }
+
+    if (segs[0].value != from){
+        window.alert("Invalid first segment: " + segs[0].value + ". 1st segment of the Src-Dst path must be the same as *From* node.");
+        return 1;
+    }
+    if (segs[segs.length-1].value != to){
+        window.alert("Invalid last segment: " + segs[segs.length-1].value + ". Last segment of the Src-Dst path must be the same as *To* node.");
+        return 1;
+    }
+
+    if (rev_segs[0].value != to){
+        window.alert("Invalid first segment: " + rev_segs[0].value + ". 1st segment of the Dst-Src path must be the same as *To* node.");
+        return 1;
+    }
+    if (rev_segs[rev_segs.length-1].value != from){
+        window.alert("Invalid last segment: " + rev_segs[rev_segs.length-1].value + ". Last segment of the Dst-Src path must be the same as *From* node.");
+        return 1;
+    }
+
+	return 0;
 }
 
 function construct_actions(segments){
@@ -226,10 +254,6 @@ function get_match(node, graph){
 	
 }
 
-//TODO
-function check_valid_segments(seg_values, seg_types){
-    return 0;
-}
 
 //Generate the SDN 'actions' field from a list of nodes describing the path.
 //Return: list of ipv6 addresses
@@ -238,9 +262,6 @@ function get_actions(seg_values, seg_types, graph){
 	ipv6s = [];
 	if (seg_values.length == 0)
 		return ret;
-    if (check_valid_segments() != 0){
-        window.alert("Invalid segments entered. Make sure:\n(1) 1st segment is always a node segment.\n(2) 1st segment is always the *from* node\n(3) last segment is always the *to* node.");
-    }
 
     //First segment is *always* first node's node segment.
     var node = get_node_by_id(graph, seg_values[0].value);
