@@ -1,4 +1,4 @@
-var url = "http://node1.srv6.safeedge.emulab.net:8080/ospf_monitor/get_topology_netjson";
+var url = "http://SDN_CONTROLLER:8080/ospf_monitor/get_topology_netjson";
 var graph;
 d3.netJsonGraph(url);
 graph = fetch_graph(url);

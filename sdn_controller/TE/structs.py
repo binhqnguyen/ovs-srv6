@@ -232,8 +232,8 @@ class G(object):
 				link_properties = {
 					"Linkstate ID": adj.LSID,
 					"Prefixes": adj.Prefixes,
-					"Src Interface Address": src_adj_segment,
-					"Dst Interface Address": dst_adj_segment,
+					"Node A's Interface Address": src_adj_segment,
+					"Node B's Interface Address": dst_adj_segment,
 					"OSPF cost (bandwidth)": "%s Mbps" % adj.W,
 				}
 				edge = {

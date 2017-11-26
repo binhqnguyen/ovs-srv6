@@ -259,7 +259,7 @@ function get_actions(seg_values, seg_types, graph){
             var edge_dst = seg_values[i].value;
             var edge = get_edge_from_src_dst(edge_src, edge_dst, graph);
             if (edge != null)
-                ipv6s.push("ipv6_dst=" + edge.properties['Dst Interface Address']);
+                ipv6s.push("ipv6_dst=" + edge.properties['Node B\'s Interface Address']);
         }
     }
 	ret = ipv6s.join(",");
