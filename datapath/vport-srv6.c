@@ -424,7 +424,7 @@ static struct sk_buff* encap_pure_packet_to_srv6(struct sk_buff* skb, struct vpo
 	inner_payload_len = __be16_to_cpu(inner_iph->payload_len);
 	full_len = sizeof(*eth_hdr) + sr_header_len +  sizeof(*inner_iph) + inner_payload_len;	//Full_len = ethernet header (14B) + sr_header_len (with segments) + 40B (inner ipv6 header) + inner ipv6 payload len.
 	
-	skb = alloc_skb(full_len, GFP_KERNEL);	//Create a new skb, to have enough room for the SR segments.
+	skb = alloc_skb(full_len, GFP_ATOMIC);	//Create a new skb, to have enough room for the SR segments. Must use GFP_ATOMIC because this is inside an interrupt.
 	skb_reserve(skb, header_size);	//reserve no head room.
 	data = skb_put(skb, full_len); 
 
