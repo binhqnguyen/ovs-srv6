@@ -171,7 +171,6 @@ class G(object):
 			for adj in self.G[ID].IntraAdjs:
 				if adj.D == 0:
 					LOG.info("\tsrcRtrID:%s,LSID:%s,W:%s,Prefixes:%s,srcIntfID:%s,srcIntfAddr:%s,dstIntfID:%s,dstRtrId:%s\n" % (adj.SrcRouterID, adj.LSID, adj.W, adj.Prefixes, adj.SrcInterfaceID, adj.SrcInterfaceAddr, adj.DstInterfaceID, adj.DstRouterID))
-					print ("\tsrcRtrID:%s,LSID:%s,W:%s,Prefixes:%s,srcIntfID:%s,srcIntfAddr:%s,dstIntfID:%s,dstRtrId:%s\n" % (adj.SrcRouterID, adj.LSID, adj.W, adj.Prefixes, adj.SrcInterfaceID, adj.SrcInterfaceAddr, adj.DstInterfaceID, adj.DstRouterID))
 
 	def printNB(self):
 		ret = ""
