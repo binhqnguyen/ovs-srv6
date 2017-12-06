@@ -13,23 +13,23 @@ The software developed for this tutorial consists of:
 * **[OSPF monitor daemon](https://gitlab.flux.utah.edu/safeedge/sripv6-linux/tree/master/ospf_monitor)**: runs on each OSPF router (i.e., routers 2,3,4,7) and listens to OSPF Link State Advertisements (LSA) to extract real-time topology of the OSPF network.
 * **[An SDN controller](https://gitlab.flux.utah.edu/safeedge/ovs-srv6/tree/master/sdn_controller)**: the controller is responsible for (1) generating network topology using the OSPF LSAs, (2) exposing a north bound API for applications to implement traffic engineer paths on the software defined infrastructure. 
 
-	![image](http://www.cs.utah.edu/~binh/archive/segment_routing/img/tutorial_software.png =600x)
+  ![image](https://gitlab.flux.utah.edu/safeedge/ovs-srv6/blob/master//tutorial_software.png =600x)
 
-	Fig. Segment Routing Framework software.
+  Fig. Segment Routing Framework software.
 
 #####Demo scenarios:
 
 * **Scenario #1:** Connectivity using **Vanilla OSPF shortest path**. Traffic going from `host1` to `host2` via the shortest path.
 
-	![image](http://www.cs.utah.edu/~binh/archive/segment_routing/img/tutorial_scenario_1.png =400x)
+  ![image](https://gitlab.flux.utah.edu/safeedge/ovs-srv6/blob/master//tutorial_scenario_1.png =400x)
 
-	Fig. Demo scenario 1.
+  Fig. Demo scenario 1.
 
 * **Scenario #2:** Connectivity using **Segmented routing**. Instead of using the shortest path, traffic going from `host1` to `host2` goes via routers `2->4->3` (using *node segments*) and the reversed path uses `3->2` (using *adjacent segments*).
 
-	![image](http://www.cs.utah.edu/~binh/archive/segment_routing/img/tutorial_scenario_2.png =400x)
+  ![image](https://gitlab.flux.utah.edu/safeedge/ovs-srv6/blob/master//tutorial_scenario_2.png =400x)
 
-	Fig. Demo scenario 2.
+  Fig. Demo scenario 2.
 
 ###B. Before you continue:
 
@@ -40,7 +40,7 @@ The software developed for this tutorial consists of:
 ###C. Network topology and experiment profile:
 **1. Network topology:**
 
- ![image](http://www.cs.utah.edu/~binh/archive/segment_routing/img/tutorial_topology.png =500x)
+ ![image](https://gitlab.flux.utah.edu/safeedge/ovs-srv6/blob/master//tutorial_topology.png =500x)
  
  Fig. Network topology.
  
@@ -50,13 +50,13 @@ The software developed for this tutorial consists of:
  * Four core routers running OSPF [Free Range Routing](https://frrouting.org/): routers `2, 3, 4, 7` in the Figure.
  * Two Open vSwitches (OVS) attached to two of the core routers. The OVSes runs as L2-bridges by default (i.e., without more specific OF rules).
  * An SDN controller. 
- 	
+  
 
 **2. Experiment profile:** 
 There is an [Emulab profile](https://www.emulab.net/portal/instantiate.php?profile=srv6-ovs&project=SafeEdge) that describes the above topology and it is packed with the environment to conduct this tutorial. It is highly recommended to use the profile for this tutorial. Otherwise, you'll need to set up the topology yourself and ensure that OSPF and Segment Routing are enabled on the OSPF routers.
 
 **3. Instantiate an experiment using the profile:** login to the [Emulab web portal](http://emulab.net/portal/) and instantiate an experiment using the profile link above. This is the web portal showing the experiment after instantiation:
- ![image](http://www.cs.utah.edu/~binh/archive/segment_routing/img/tutorial_profile.png =600x)
+ ![image](https://gitlab.flux.utah.edu/safeedge/ovs-srv6/blob/master//tutorial_profile.png =600x)
 
  Fig. Experiment portal in Emulab.
 
@@ -114,7 +114,7 @@ Note that the connectivity is now provided by the **vanilla OSPF** (i.e., shorte
 2. Install the web portal on *node 1*:
         sudo cp -r /opt/openvswitch/sdn_controller/www /var/
 3. Access the web portal: open a web browser, enter the ulr: `http://<node1 name>/web-portal/`. The web portal should look like this:
-![image](http://www.cs.utah.edu/~binh/archive/segment_routing/img/tutorial_webportal.png =600x)
+![image](https://gitlab.flux.utah.edu/safeedge/ovs-srv6/blob/master//tutorial_webportal.png =600x)
 
 4. The web portal shows the topology of your OSPF routers. You can also implement a path using the portal.
     For example, to implement a path from *router 2* to *router 3* using node segments `2->4->3` for the `2->3` path and adjacent segments `3->2` for the reversed path:
@@ -135,10 +135,10 @@ When an interface or a link in the OSPF network fails, the SDN controller will b
 
 To turn down a link, login to router 2 (`node 2`) and turn down an interface, e.g.:
 
-		sudo ifconfig eth2 down
-		
+    sudo ifconfig eth2 down
+    
 After around 10s, refresh the web-portal. You'll see that the network topology is now changed:
-	![image](http://www.cs.utah.edu/~binh/archive/segment_routing/img/tutorial_linkdown.png =600x)
+  ![image](https://gitlab.flux.utah.edu/safeedge/ovs-srv6/blob/master//tutorial_linkdown.png =600x)
 
 ###L. Contact:
 If you have questions, contact Binh Nguyen (luminbinh@gmail.com or binh@cs.utah.edu). Upstream merges are welcome! 
