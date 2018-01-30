@@ -34,6 +34,7 @@ from structs import *
 from ospfv3 import *
 import json
 import time
+import sys
 
 LOG = logging.getLogger('ryu.app.Te_controller')
 LOG.setLevel(logging.DEBUG)
@@ -42,6 +43,11 @@ class Te_controller(ControllerBase):
 
 	#Graph, static variable
 	graph = G()
+	HEADERS = {
+		'Access-Control-Allow-Origin': '*',
+		'Access-Control-Allow-Methods': 'GET, POST',
+		'Access-Control-Allow-Headers': 'Origin, Content-Type',
+		'Content-Type':'application/json'}
 
 	def __init__(self, req, link, data, **config):
 		super(Te_controller, self).__init__(req, link, data, **config)
@@ -104,6 +110,142 @@ class Te_controller(ControllerBase):
 			'Access-Control-Allow-Headers': 'Origin, Content-Type',
                         'Content-Type':'application/json'}
 		return Response(content_type='application/json', body=json.dumps(graph), headers=headers)
+
+	#REST API - Set network condition
+	def set_network_condition(self, req, **_kwargs):
+		post = req.json
+		print post
+		if len(post) != 3 or "field_name" not in post:
+                        LOG.info("INVALID POST values: %s" % post)
+                        return Response(status=404, headers=self.HEADERS)
+		srcRouterID, dstRouterID, field_name, new_value = self._get_changed_field(post)
+		if srcRouterID is None or field_name is None or new_value is None:
+			LOG.error("Can't find changed field in post request: %s" % s)
+			return Response(status=404, headers=self.HEADERS)
+
+		if self._process_new_network_condition(srcRouterID, dstRouterID, field_name, new_value) != 0:
+			LOG.error("Can't process new network condition, post request: %s" % post)
+			return Response(status=404, headers=self.HEADERS)
+		else:
+			LOG.info("Network condition changed, srcRouterID: %s, dstRouterID: %s, field_name: %s, new_value: %s. Network reacted!" % (srcRouterID, dstRouterID, field_name, new_value))
+			return Response(status=200, headers=self.HEADERS)
+
+
+
+	def _process_new_network_condition(self, srcRouterID, dstRouterID, field_name, new_value):
+		LOG.info("New network condition: srcRouterID:%s, dstRouterID:%s, field_name:%s, new_value:%s" % (srcRouterID, dstRouterID, field_name, new_value))
+		#Update the graph with new value for the field
+		graph = Te_controller.graph.G
+		is_found = None
+		for VID in graph:
+			for adj in graph[VID].IntraAdjs:
+				if (adj.SrcRouterID == srcRouterID and adj.DstRouterID == dstRouterID) or (adj.DstRouterID == srcRouterID and adj.SrcRouterID == dstRouterID):
+					is_found = 1
+					setattr(adj, field_name, new_value)
+					LOG.debug("adj:%s" % adj.str_me())
+		if is_found is None:
+			LOG.error("Can't update network graph with field_name: %s and new_value: %s" % (field_name, new_value))
+			return 1
+
+		LOG.info("Network condition changed, srcRouterID: %s, dstRouterID:%s, field_name: %s, new_value: %s" % (srcRouterID, dstRouterID, field_name, new_value))
+		Te_controller.graph.print_me()		
+		#Install new route in the network
+		self.DFS_visited  = []
+		self._new_path = []
+		self._get_updated_path(graph, [])
+		LOG.info(self._new_path)
+		if len(self._new_path) == 0:
+			LOG.warn("Can't find a path in the network!")
+			return 1
+		return self._install_path(self._new_path)
+		
+	
+	def _install_path(self, path):
+                graph = Te_controller.graph.G
+		#A->B
+		ab_path = path
+		ab_path_dst = path[-1]
+		ab_path_labels = self._get_labels(ab_path)
+		ab_path_dst_list = Te_controller.graph._get_prefixes(graph[ab_path_dst])
+		#LOG.info("AB path:%s, AB path dst:%s, AB path labels:%s, AB path dst:%s" % (ab_path, ab_path_dst, ab_path_labels, ab_path_dst_list))
+		self._install_sr_rules(ab_path[0], ab_path_dst, ab_path_labels, ab_path_dst_list)
+
+		#B->A
+		ba_path = path[::-1]
+		ba_path_dst = ba_path[-1]
+		ba_path_labels = self._get_labels(ba_path)
+		ba_path_dst_list = Te_controller.graph._get_prefixes(graph[ba_path_dst])
+		#LOG.info("BA path:%s, BA path dst:%s, BA path labels:%s, BA path dst:%s" % (ba_path, ba_path_dst, ba_path_labels, ba_path_dst_list))
+		self._install_sr_rules(ba_path[0], ba_path_dst, ba_path_labels, ba_path_dst_list)
+
+		return 0
+
+	def _install_sr_rules(self, src, dst, labels, dst_list): 
+		SR = SR_flows_mgmt()
+
+		#SR_PORT Rule
+		priority = 2
+		dpid = src
+		for dst in dst_list:
+			match = {
+				'dl_src': None,
+				'out_port': None,
+				'ipv6_dst': "%s/64" %dst, 
+				'eth_type': '0X86DD',
+				'in_port': 1
+			}
+			actions = {
+				'output': 5,
+				'mod_dl_dst': None,
+				'ipv6_dst': labels
+			}
+			if not SR.insert_single_flow(dpid, priority, match, actions):
+				LOG.info("Inserted a flow.")
+			else:
+				LOG.error("Can't insert a flow!")
+		return 0
+
+	def _get_labels(self, path):
+                graph = Te_controller.graph.G
+		ret = []
+		for i in path:
+			ret.append(Te_controller.graph._get_node_segments(graph[i])[0])
+		return ret
+
+	#Default path is from 2 to 3: 2->3 and 3->2.
+	#If a link is congested, not using the link for the paths. eg, shortest paths without the link, eg, DFS.
+	def _get_updated_path(self, graph, path, root = 2, dst = 3):
+		#LOG.info("_update_path, root = %s" % root)
+		if root == dst:
+			path.append(root)
+			LOG.info("Path: %s" % path)
+			if len(self._new_path) == 0 or len(path) <= len(self._new_path):
+				self._new_path = list(path)
+			path.pop()
+			return 
+		self.DFS_visited.append(root)
+		path.append(root)
+		for adj in graph[root].IntraAdjs:
+			adj_node_id = adj.DstRouterID
+			if adj_node_id is None or adj.Ultilization >= 1:
+				continue
+			if adj_node_id not in self.DFS_visited :
+				self._get_updated_path(graph, path, adj_node_id)
+		
+		path.pop()
+		self.DFS_visited.pop()
+		return 
+
+	def _get_changed_field(self, post):
+		for f in post:
+			if f == "field_name":
+				try:
+					return int(post['LSID'].split('-')[0]), int(post['LSID'].split('-')[1]),  post['field_name'], float(post['new_value'])
+				except:
+					return int(post['LSID'].split('-')[0]), int(post['LSID'].split('-')[1]),  post['field_name'], str(post['new_value'])
+	
+		return None, None, None, None
+
 
 	def get_topology_netjson(self, req, **_kwargs):
 		graph = Te_controller.graph.translate_to_dict_netjson()
@@ -253,6 +395,7 @@ class Te_controller(ControllerBase):
 			src_router.IntraAdjs.append(src_router_adj)
 
 		Te_controller.graph.addV(src_router)
+		Te_controller.graph.remove_duplicated_adjs(src_router_id)
 		Te_controller.graph.print_me()
 			
 				
@@ -324,6 +467,7 @@ class Te_controller(ControllerBase):
 			src_router.IntraAdjs.append(src_router_adj)
 
 		Te_controller.graph.addV(src_router)
+		Te_controller.graph.remove_duplicated_adjs(src_router_id)
 		Te_controller.graph.print_me()
 
 

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Link Utilization</title>
+
+    <script language="javascript">
+        window.onload = function() {
+            httpGetAsync('http://node1.binh-qv32531.safeedge.emulab.net:8080/ospf_monitor/get_topology_netjson', transform);
+        };
+
+        function httpGetAsync(theUrl, callback)
+        {
+            var xmlHttp = new XMLHttpRequest();
+            xmlHttp.onreadystatechange = function() {
+                if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
+                    callback(xmlHttp.responseText);
+            }
+            xmlHttp.open("GET", theUrl, true); // true for asynchronous
+            xmlHttp.send(null);
+        }
+
+        function httpPost(url, data) {
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("POST", url, true);
+            //xhttp.setRequestHeader("Content-type", "application/json");
+            xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+            xhttp.send(JSON.stringify(data));
+
+            // var response = JSON.parse(xhttp.responseText);
+        }
+
+        function transform(my_arg){
+            var data = JSON.parse(my_arg);
+            var links = data.links;
+            var select = document.getElementById('linksSelect');
+
+            for(var i in links)
+            {
+                // console.log(links[i]);
+                var opt = document.createElement("option");
+                opt.value= JSON.stringify(links[i], null, 2);
+                opt.innerHTML = '' + links[i].source + ' -> ' + links[i].target;
+                select.appendChild(opt);
+            }
+        }
+
+        function printLinkInfo() {
+            var sel = document.getElementById('linksSelect');
+            document.getElementById('linkInfo').value = sel.options[sel.selectedIndex].value;
+        }
+
+        function submitNewUtilization() {
+            var select = document.getElementById('linksSelect');
+            var link = JSON.parse(select.options[select.selectedIndex].value);
+            var newValue = parseFloat(document.getElementById('utilizationInput').value);
+
+            if (!isNaN(newValue)) {
+                var data = {
+                    LSID: link.source + '-' + link.target,
+                    field_name: 'Ultilization',
+                    new_value: newValue
+                };
+                httpPost('http://node1.binh-qv32531.safeedge.emulab.net:8080/ospf_monitor/set_network_condition', data);
+            } else {
+                console.log('Please specify the correct floating number!');
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div>
+        <label> <font size="5"> Select Link: </font> </label> <select id="linksSelect" onchange="printLinkInfo()"></select>
+    </div>
+
+    <div>
+        <textarea id="linkInfo" rows="20" cols="70"></textarea>
+    </div>
+
+    <div>
+        <label> <font size="5"> Link utilization (0.0 - 1.0): </font> </label> <input type="text" id="utilizationInput">
+        <button id="submitBtn" onclick="submitNewUtilization()">Submit</button>
+    </div>
+</body>
+</html>

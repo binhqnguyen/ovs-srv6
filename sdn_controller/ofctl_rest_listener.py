@@ -115,6 +115,19 @@ class SR_rest_api(app_manager.RyuApp):
                        controller=Te_controller, action='get_topology_netjson',
                        conditions=dict(method=['GET']))
 
+     	uri = ospf_monitor_path + '/set_network_condition'
+        mapper.connect(ospf_monitor, uri,
+                       controller=North_api, action='handle_http_options',
+                       conditions=dict(method=['OPTIONS']))
+
+
+
+	uri = ospf_monitor_path + '/set_network_condition'
+        mapper.connect(ospf_monitor, uri,
+                       controller=Te_controller, action='set_network_condition',
+                       conditions=dict(method=['POST']))
+
+
 
 
 

@@ -82,6 +82,8 @@ class North_api(ControllerBase):
                		return Response(status=404, headers=HEADERS)
         	actions = A.parse_actions_fields(post['actions'])
         	match = M.parse_match_fields(post['match'])
+		LOG.info("XXXXXXXACTION=%s"%actions)
+		LOG.info("XXXXXXXMATCH=%s"%match)
         	dpid = post['dpid']
         	priority = 0
         	if 'priority' in post:
